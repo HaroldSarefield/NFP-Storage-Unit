@@ -113,6 +113,28 @@ details.sec>summary .subtle{margin-left:auto;margin-right:10px} details.sec>summ
 .hdr{padding:10px 14px 6px;font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .subtle{font-size:12px;color:var(--muted)}
 .linkbtn{border:0;background:transparent;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
+#editbtn{margin-left:auto}
+.btn.danger{color:#b3261e;border-color:#e3b2ad}
+.editbar{padding:10px 14px;background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-bottom:1px solid var(--line);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.erow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line)}
+.erow .n{font-weight:500;min-width:0}
+.rname{border:0;background:transparent;text-align:left;cursor:pointer;padding:0;font:inherit;font-weight:500}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.sbtn{border:0;background:var(--surface-2);width:34px;height:34px;font-size:18px;cursor:pointer;color:var(--fg)}
+.sbtn:active{background:var(--fg);color:var(--bg)}
+.snum{width:52px;border:0;text-align:center;font:600 15px var(--f-mono);background:transparent;color:var(--fg);padding:0}
+.stext{width:120px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);color:var(--fg)}
+.xbtn{border:1px solid var(--line);background:var(--surface);color:var(--muted);width:30px;height:30px;border-radius:999px;cursor:pointer;font-size:16px}
+.xbtn:hover{color:#b3261e;border-color:#e3b2ad}
+.addline{display:flex;gap:6px;margin-top:8px}
+.addline input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.modal{position:fixed;inset:0;background:rgba(10,12,10,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.mbox{background:var(--surface);color:var(--fg);border-radius:12px;max-width:440px;width:100%;padding:20px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.mbox h2{font:800 20px var(--f-display);margin:0 0 6px}
+.mbox ol{padding-left:18px;margin:6px 0 10px}
+.merr{color:#b3261e;font-size:13px;min-height:1em;margin:0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;display:flex;gap:14px;align-items:center;z-index:60;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast button{border:0;background:transparent;color:var(--accent);font-weight:700;cursor:pointer;font-size:14px}
 @media (max-width:900px){
   .app{height:auto;grid-template-rows:auto auto}
   .main{grid-template-columns:1fr}
@@ -128,9 +150,11 @@ details.sec>summary .subtle{margin-left:auto;margin-right:10px} details.sec>summ
     <h1>NFP Storage Unit</h1>
     <p>Type what you need and the model shows you where it is.</p>
     <span id="savestate">Connecting…</span>
+    <button class="btn" id="editbtn">Edit</button>
   </header>
   <div class="main">
     <aside class="panel">
+      <div class="editbar" id="editbar" hidden></div>
       <div class="search">
         <label for="q" class="ask">What are you looking for?</label>
         <div class="qwrap"><input id="q" type="search" placeholder="Try “diapers”, “baby scale” or “frames”" autocomplete="off"><button class="qclear" id="qclear" aria-label="Clear search" hidden>×</button></div>
@@ -169,6 +193,8 @@ details.sec>summary .subtle{margin-left:auto;margin-right:10px} details.sec>summ
       </div>
     </div>
   </div>
+  <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="Editor login"><div class="mbox"></div></div>
+  <div class="toast" id="toast" hidden role="status"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -935,7 +961,7 @@ document.getElementById('t-float').onclick=e=>{ floatLabels=!floatLabels; e.curr
 
 // ================= PANEL (finding things) =================
 const listEl=document.getElementById('list'), detailEl=document.getElementById('detail'), q=document.getElementById('q'), qclear=document.getElementById('qclear');
-let editing=null, openSecs=new Set(); // editing: {type:'c'|'i'|'new', id}
+let openSecs=new Set();
 const esc = s => String(s??'').replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const confPill = c => c==='seen'?'<span class="pill seen">confirmed</span>':c==='likely'?'<span class="pill likely">best guess</span>':c==='unreadable'?'<span class="pill unknown">label unclear</span>':'<span class="pill unknown">not found yet</span>';
 const invFor = id => invList().filter(r=>r.where.includes(id));
@@ -975,98 +1001,123 @@ function whereBlock(ids, fallback){
 }
 const walkBtn = '<button class="btn" id="walkthere">Walk me there</button>';
 function wireWalk(ids){ const b=document.getElementById('walkthere'); if(b) b.onclick=()=>{ if(mode==='2d') setMode('3d'); if(nav!=='walk'){ walk.x=5; walk.z=0.6; walk.y=5.2; walk.yaw=0; walk.pitch=-0.1; setNav('walk'); } focusOn(ids); }; }
-function closeDetail(){ selected=null; editing=null; detailEl.hidden=true; listEl.hidden=false; highlight=q.value.trim()?highlight:null; applyStyles(); renderPlan(); }
+function closeDetail(){ selected=null; detailEl.hidden=true; listEl.hidden=false; highlight=q.value.trim()?highlight:null; applyStyles(); renderPlan(); }
 function openCard(){ detailEl.hidden=false; listEl.hidden=true; detailEl.scrollTop=0; if (matchMedia('(max-width:900px)').matches) document.getElementById('stage').scrollIntoView({behavior: reduceMotion()?'auto':'smooth', block:'start'}); }
+
+// ---------- Cards ----------
+const isNum = v => /^\d+$/.test(String(v).trim());
+function stepperHTML(id, val){ return isNum(val)
+  ? `<span class="stepper"><button type="button" class="sbtn" data-step="-1" data-for="${id}" aria-label="One less">−</button><input id="${id}" class="snum" inputmode="numeric" value="${esc(val)}" aria-label="How many"><button type="button" class="sbtn" data-step="1" data-for="${id}" aria-label="One more">+</button></span>`
+  : `<input id="${id}" class="stext" value="${esc(val)}" aria-label="How many">`; }
+function wireSteppers(root, onCount){
+  root.querySelectorAll('.sbtn').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const inp=document.getElementById(b.dataset.for); const n=Math.max(0,(parseInt(inp.value,10)||0)+Number(b.dataset.step)); inp.value=n; onCount(inp, String(n)); });
+  root.querySelectorAll('.snum,.stext').forEach(inp=>{ inp.onclick=e=>e.stopPropagation(); inp.onchange=()=>onCount(inp, inp.value.trim()||'0'); inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); }; });
+}
 
 function showDetail(id){
   if (!id){ closeDetail(); return; }
   const c=eff(id), inv=invFor(id), edited=!!ovC[id];
   openCard();
-  if (editing && editing.type==='c' && editing.id===id){
-    detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Fix info: ${esc(c.title)}</h2>
-      <form class="edit" id="ef">
-        <label for="f-sticky">What the pink note says<input id="f-sticky" type="text" value="${esc(c.sticky||'')}" placeholder="Leave empty if there is no note"></label>
+  if (editOn){
+    detailEl.innerHTML = `<button class="back" id="dback">← Back</button>
+      <h2>${esc(c.title)}</h2>
+      <form class="edit" id="ef" onsubmit="return false">
+        <label for="f-sticky">Pink note says<input id="f-sticky" type="text" value="${esc(c.sticky||'')}" placeholder="No note on this one"></label>
         <label for="f-title">Name<input id="f-title" type="text" value="${esc(c.title)}"></label>
-        <label for="f-items">What's inside (one per line)<textarea id="f-items">${esc(c.items.join('\n'))}</textarea></label>
-        <label class="check" for="f-checked"><input id="f-checked" type="checkbox" ${c.conf!=='unreadable'?'checked':''}> I've checked this in person</label>
-        <div class="actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="fcancel">Cancel</button>${edited?'<button class="btn" type="button" id="freset">Undo my changes</button>':''}</div>
-      </form>`;
-    document.getElementById('ef').onsubmit = async e=>{ e.preventDefault();
-      const data={ sticky:document.getElementById('f-sticky').value.trim()||null, title:document.getElementById('f-title').value.trim()||byId[id].title,
-        items:document.getElementById('f-items').value.split('\n').map(s=>s.trim()).filter(Boolean), conf:document.getElementById('f-checked').checked?'seen':'unreadable', updatedAt:Date.now() };
-      editing=null; await saveC(id,data); };
-    document.getElementById('fcancel').onclick=()=>{ editing=null; showDetail(id); };
-    const rs=document.getElementById('freset'); if(rs) rs.onclick=async()=>{ editing=null; await saveC(id,null); };
-    document.getElementById('dback').onclick=()=>{ editing=null; showDetail(id); };
+      </form>
+      <div class="hdr" style="padding-inline:0">Items in this box</div>
+      <div id="boxitems">${inv.length? inv.map(r=>`<div class="erow" data-key="${esc(r.key)}"><span class="n">${esc(r.name)}</span>${stepperHTML('bx-'+r.key, r.count)}<button class="xbtn" data-del="${esc(r.key)}" aria-label="Remove ${esc(r.name)}">×</button></div>`).join('') : '<p class="subtle">Nothing from the list is assigned here yet.</p>'}</div>
+      <form class="addline" id="addhere"><input id="ah-name" placeholder="Add an item to this box" aria-label="Item name"><input id="ah-count" inputmode="numeric" placeholder="#" aria-label="How many" style="width:56px"><button class="btn primary" type="submit">Add</button></form>
+      <form class="edit" onsubmit="return false" style="margin-top:14px">
+        <label for="f-items">Other notes about what's inside (one per line)<textarea id="f-items">${esc(c.items.join('\n'))}</textarea></label>
+        <label class="check" for="f-checked"><input id="f-checked" type="checkbox" ${c.conf!=='unreadable'?'checked':''}> I've checked this box in person</label>
+      </form>
+      ${edited?'<div class="actions"><button class="linkbtn" id="freset">Undo all my changes to this box</button></div>':''}`;
+    const saveBox = ()=>{ setC(id,{ sticky:document.getElementById('f-sticky').value.trim()||null, title:document.getElementById('f-title').value.trim()||byId[id].title,
+      items:document.getElementById('f-items').value.split('\n').map(s=>s.trim()).filter(Boolean), conf:document.getElementById('f-checked').checked?'seen':'unreadable' }); build(id); applyStyles(); };
+    ['f-sticky','f-title','f-items'].forEach(f=>document.getElementById(f).onchange=saveBox);
+    document.getElementById('f-checked').onchange=saveBox;
+    ['f-sticky','f-title'].forEach(f=>document.getElementById(f).onkeydown=e=>{ if(e.key==='Enter') e.target.blur(); });
+    wireSteppers(detailEl, (inp,val)=>{ setI(inp.id.slice(3),{count:val}); });
+    detailEl.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>removeItem(b.dataset.del, ()=>showDetail(id)));
+    document.getElementById('addhere').onsubmit=e=>{ e.preventDefault(); const name=document.getElementById('ah-name').value.trim(); if(!name) return;
+      addItem({name, count:document.getElementById('ah-count').value.trim()||'1', where:[id]}); showDetail(id); toast(`Added ${name}`); const n=document.getElementById('ah-name'); if(n) n.focus(); };
+    const rs=document.getElementById('freset'); if(rs) rs.onclick=()=>{ const prev=ovC[id]; setRawC(id,null); build(id); applyStyles(); showDetail(id); toast('Box changes undone', ()=>{ setRawC(id,prev); build(id); applyStyles(); showDetail(id); }); };
+    document.getElementById('dback').onclick=closeDetail;
     return;
   }
   detailEl.innerHTML = `<button class="back" id="dback">← Back to ${q.value.trim()?'results':'the list'}</button>
     <h2>${esc(label(c))}</h2>
     ${whereBlock([id])}
-    <div class="hdr" style="padding-inline:0">Inside</div>
-    <ul>${c.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
-    ${inv.length?`<div class="hdr" style="padding-inline:0">From the inventory sheet</div><ul>${inv.map(r=>`<li><b>${esc(r.name)}</b>: ${esc(r.count)}</li>`).join('')}</ul>`:''}
-    <div class="actions">${walkBtn}${canWrite!==false?'<button class="linkbtn" id="fedit">Something wrong? Fix it</button>':''}</div>
+    ${inv.length?`<div class="hdr" style="padding-inline:0">Items in this box</div><ul>${inv.map(r=>`<li><b>${esc(r.name)}</b>: ${esc(r.count)}</li>`).join('')}</ul>`:''}
+    ${c.items.length?`<div class="hdr" style="padding-inline:0">Notes</div><ul>${c.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}
+    <div class="actions">${walkBtn}</div>
     <p class="subtle">${confPill(c.conf)} ${edited?'<span class="pill edited">edited</span>':''}</p>`;
   document.getElementById('dback').onclick=closeDetail;
-  const fe=document.getElementById('fedit'); if(fe) fe.onclick=()=>{ editing={type:'c',id}; showDetail(id); };
   wireWalk([id]);
 }
 
 function showInvDetail(key){
   const r = invList().find(x=>x.key===key); if(!r){ closeDetail(); return; }
   openCard();
-  if (editing && editing.type==='i' && editing.id===key){
-    detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Fix info: ${esc(r.name)}</h2>
-      <form class="edit" id="ef">
-        ${r.custom?`<label for="f-name">Item name<input id="f-name" type="text" value="${esc(r.name)}"></label>`:''}
-        <label for="f-count">How many<input id="f-count" type="text" value="${esc(r.count)}"></label>
+  if (editOn){
+    detailEl.innerHTML = `<button class="back" id="dback">← Back</button>
+      <form class="edit" id="ef" onsubmit="return false">
+        <label for="f-name">Item<input id="f-name" type="text" value="${esc(r.name)}"></label>
+        <label>How many ${stepperHTML('f-count', r.count)}</label>
         <label for="f-where">Where is it?<select id="f-where">${boxOptions(r.where[0]||'')}</select></label>
-        <label for="f-conf">How sure<select id="f-conf"><option value="seen" ${r.conf==='seen'?'selected':''}>Confirmed</option><option value="likely" ${r.conf==='likely'?'selected':''}>Best guess</option><option value="unknown" ${r.conf==='unknown'?'selected':''}>Not found yet</option></select></label>
-        <label for="f-note">Note<input id="f-note" type="text" value="${esc(r.note)}"></label>
-        <div class="actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="fcancel">Cancel</button>${r.custom?'<button class="btn" type="button" id="fdel">Delete item</button>':(ovI[key]?'<button class="btn" type="button" id="freset">Undo my changes</button>':'')}</div>
-      </form>`;
-    document.getElementById('ef').onsubmit=async e=>{ e.preventDefault();
-      const w=document.getElementById('f-where').value, old=r.where;
-      const data={ ...(r.custom?{custom:true, sec:r.sec, name:document.getElementById('f-name').value.trim()||r.name}:{}), count:document.getElementById('f-count').value.trim(), where: w? (old[0]===w? old : [w]) : [], conf:document.getElementById('f-conf').value, note:document.getElementById('f-note').value.trim(), updatedAt:Date.now() };
-      editing=null; await saveI(key,data); };
-    document.getElementById('fcancel').onclick=document.getElementById('dback').onclick=()=>{ editing=null; showInvDetail(key); };
-    const rs=document.getElementById('freset'); if(rs) rs.onclick=async()=>{ editing=null; await saveI(key,null); };
-    const dl=document.getElementById('fdel'); if(dl) dl.onclick=async()=>{ editing=null; closeDetail(); await saveI(key,null); };
+        <label for="f-note">Note<input id="f-note" type="text" value="${esc(r.note)}" placeholder="Optional"></label>
+      </form>
+      <div class="actions"><button class="btn danger" id="fdel">Remove from the list</button></div>
+      ${whereBlock(r.where)}`;
+    wireSteppers(detailEl, (inp,val)=>setI(key,{count:val}));
+    document.getElementById('f-name').onchange=e=>{ const v=e.target.value.trim(); if(v) setI(key,{name:v}); };
+    document.getElementById('f-note').onchange=e=>setI(key,{note:e.target.value.trim()});
+    ['f-name','f-note'].forEach(f=>document.getElementById(f).onkeydown=e=>{ if(e.key==='Enter') e.target.blur(); });
+    document.getElementById('f-where').onchange=e=>{ const w=e.target.value; setI(key,{where:w?[w]:[], conf:w?'seen':'unknown'}); highlight=new Set(w?[w]:[]); applyStyles(); renderPlan(); if(w) focusOn([w]); showInvDetail(key); };
+    document.getElementById('fdel').onclick=()=>removeItem(key, closeDetail);
+    document.getElementById('dback').onclick=closeDetail;
     return;
   }
   detailEl.innerHTML = `<button class="back" id="dback">← Back to ${q.value.trim()?'results':'the list'}</button>
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:6px"><h2 style="margin:0">${esc(r.name)}</h2><span class="count">${esc(r.count)}</span></div>
-    ${r.was?`<p class="subtle" style="margin:2px 0 0">Count corrected by hand (typed sheet said ${esc(r.was)})</p>`:''}
+    ${r.was && !ovI[key]?`<p class="subtle" style="margin:2px 0 0">Count corrected by hand (typed sheet said ${esc(r.was)})</p>`:''}
     ${whereBlock(r.where)}
     ${r.note?`<p class="subtle">Note: ${esc(r.note)}</p>`:''}
-    <div class="actions">${r.where.length?walkBtn:''}${canWrite!==false?'<button class="linkbtn" id="fedit">Something wrong? Fix it</button>':''}</div>
+    <div class="actions">${r.where.length?walkBtn:''}</div>
     <p class="subtle">${confPill(r.conf)} ${ovI[key]&&!r.custom?'<span class="pill edited">edited</span>':''}</p>`;
   document.getElementById('dback').onclick=closeDetail;
-  const fe=document.getElementById('fedit'); if(fe) fe.onclick=()=>{ editing={type:'i',id:key}; showInvDetail(key); };
   wireWalk(r.where);
 }
 
-function showNewItem(){
-  editing={type:'new'}; openCard();
-  detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Add something to the list</h2>
+function showNewItem(prefill){
+  openCard();
+  detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Add an item</h2>
     <form class="edit" id="ef">
-      <label for="n-name">What is it?<input id="n-name" type="text" required></label>
-      <label for="n-count">How many<input id="n-count" type="text"></label>
+      <label for="n-name">What is it?<input id="n-name" type="text" required value="${esc(prefill||'')}"></label>
+      <label for="n-count">How many<input id="n-count" type="text" inputmode="numeric" value="1"></label>
       <label for="n-where">Where is it?<select id="n-where">${boxOptions(selected||'')}</select></label>
-      <label for="n-sec">Group<select id="n-sec">${SECTIONS.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label>
-      <label for="n-note">Note<input id="n-note" type="text"></label>
-      <div class="actions"><button class="btn primary" type="submit">Add</button><button class="btn" type="button" id="fcancel">Cancel</button></div>
+      <div class="actions"><button class="btn primary" type="submit">Add item</button><button class="btn" type="button" id="fcancel">Cancel</button></div>
     </form>`;
-  document.getElementById('ef').onsubmit=async e=>{ e.preventDefault(); const name=document.getElementById('n-name').value.trim(); if(!name) return;
-    const key='c-'+slug(name)+'-'+Date.now().toString(36), w=document.getElementById('n-where').value;
-    editing=null; closeDetail();
-    await saveI(key,{custom:true,name,count:document.getElementById('n-count').value.trim()||'—',sec:document.getElementById('n-sec').value,where:w?[w]:[],conf:w?'seen':'unknown',note:document.getElementById('n-note').value.trim(),updatedAt:Date.now()}); };
-  document.getElementById('fcancel').onclick=document.getElementById('dback').onclick=()=>{ editing=null; closeDetail(); };
+  const n=document.getElementById('n-name'); n.focus();
+  document.getElementById('ef').onsubmit=e=>{ e.preventDefault(); const name=n.value.trim(); if(!name) return; const w=document.getElementById('n-where').value;
+    const key=addItem({name, count:document.getElementById('n-count').value.trim()||'1', where:w?[w]:[]}); toast(`Added ${name}`); q.value=''; render(); pickItem(key); };
+  document.getElementById('fcancel').onclick=document.getElementById('dback').onclick=closeDetail;
 }
 
-function select(id, fly=true){ selected=id; editing=null; highlight=new Set([id]); showDetail(id); applyStyles(); renderPlan(); if(fly) focusOn([id]); }
-function pickItem(key){ const r=invList().find(x=>x.key===key); if(!r) return; editing=null; selected=r.where[0]||null;
+// ---------- Edit operations ----------
+function addItem({name,count,where}){
+  const key='c-'+slug(name)+'-'+Date.now().toString(36);
+  setI(key,{custom:true,name,count,sec:'Added items',where,conf:where.length?'seen':'unknown',note:''}); return key;
+}
+function removeItem(key, after){
+  const r=invList().find(x=>x.key===key); if(!r) return; const prev=ovI[key]?{...ovI[key]}:null;
+  if (r.custom) setRawI(key,null); else setI(key,{deleted:true});
+  after&&after(); render();
+  toast(`Removed ${r.name}`, ()=>{ setRawI(key,prev); render(); if(!detailEl.hidden) after&&after(); });
+}
+function select(id, fly=true){ selected=id; highlight=new Set([id]); showDetail(id); applyStyles(); renderPlan(); if(fly) focusOn([id]); }
+function pickItem(key){ const r=invList().find(x=>x.key===key); if(!r) return; selected=r.where[0]||null;
   highlight = new Set(r.where.length? r.where : ['brown','large']); showInvDetail(key); applyStyles(); renderPlan(); focusOn(r.where.length? r.where : ['brown','large']); }
 
 // search: forgiving matching (plurals + common other words)
@@ -1083,14 +1134,16 @@ function matcher(qs){
 }
 const QUICK = ['Diapers','Baby scales','Grooming kits','Toys','Frames','Handouts','Swings','Models','Books'];
 function rowItem(r){ const where = r.where.length ? eff(r.where[0]).zone : 'Not spotted yet';
+  if (editOn) return `<div class="erow" data-key="${esc(r.key)}"><button class="n rname">${esc(r.name)}<span class="subtle" style="display:block;font-weight:400">${esc(where)}</span></button>${stepperHTML('ls-'+r.key, r.count)}<button class="xbtn" data-del="${esc(r.key)}" aria-label="Remove ${esc(r.name)}">×</button></div>`;
   return `<button class="row" data-key="${esc(r.key)}"><span class="n">${esc(r.name)}</span><span class="c">${esc(r.count)}</span><span class="s"><span>${esc(where)}</span>${r.conf!=='seen'?confPill(r.conf):''}</span></button>`; }
 function rowBox(c){ return `<button class="row" data-ids="${c.id}"><span class="n"><span class="swatch" style="background:${c.col}"></span>${esc(label(c))}</span><span class="c"></span><span class="s"><span>${esc(c.zone)}</span></span></button>`; }
 
 function render(){
   const needle=q.value.trim(); qclear.hidden=!needle;
   document.getElementById('chips').innerHTML = needle ? '' : QUICK.map(t=>`<button class="chip" data-q="${t}">${t}</button>`).join('');
-  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ q.value=b.dataset.q; render(); const first=listEl.querySelector('.row'); if(first) first.click(); });
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ q.value=b.dataset.q; render(); const first=listEl.querySelector('.row,.rname'); if(first) first.click(); });
   let html=''; const all=invList();
+  if (editOn) html+=`<div class="addrow"><button class="btn primary" id="addItem" style="width:100%">+ Add an item</button></div>`;
   if (needle){
     const m=matcher(needle);
     const items=all.filter(r=>m(r.name+' '+r.note+' '+r.sec));
@@ -1099,72 +1152,181 @@ function render(){
     highlight = hits.size? hits : new Set();
     if (items.length) html+=`<div class="hdr">On the inventory list</div>`+items.map(rowItem).join('');
     if (boxes.length) html+=`<div class="hdr">Boxes &amp; bins</div>`+boxes.map(rowBox).join('');
-    if (!items.length && !boxes.length) html=`<div class="empty"><b>Nothing matches “${esc(needle)}”.</b><br>Try a shorter word, or check the back wall boxes, where most boxed items from the list are kept.${canWrite!==false?'<div class="actions"><button class="btn" id="addItem">Add it to the list</button></div>':''}</div>`;
+    if (!items.length && !boxes.length) html+=`<div class="empty"><b>Nothing matches “${esc(needle)}”.</b><br>Try a shorter word, or check the back wall boxes, where most boxed items from the list are kept.${editOn?`<div class="actions"><button class="btn" id="addThis">Add “${esc(needle)}” to the list</button></div>`:''}</div>`;
   } else {
     if (!selected) highlight=null;
-    html+=`<div class="hdr">Or browse everything</div>`;
+    html+=`<div class="hdr">${editOn?'Tap + or − to change a count':'Or browse everything'}</div>`;
     const secs=[...SECTIONS, ...new Set(all.map(r=>r.sec).filter(s=>!SECTIONS.includes(s)))];
     secs.forEach(sec=>{ const rs=all.filter(r=>r.sec===sec); if(!rs.length) return;
       html+=`<details class="sec" data-sec="${esc(sec)}" ${openSecs.has(sec)?'open':''}><summary>${esc(sec)} <span class="subtle">${rs.length}</span></summary>${rs.map(rowItem).join('')}</details>`; });
     const zones=[...new Set(C.map(c=>c.zone))];
     html+=`<details class="sec" data-sec="__boxes" ${openSecs.has('__boxes')?'open':''}><summary>Every box, by location <span class="subtle">${C.length}</span></summary>${zones.map(z=>`<div class="hdr">${esc(z)}</div>`+C.filter(c=>c.zone===z).map(c=>rowBox(eff(c.id))).join('')).join('')}</details>`;
-    if (canWrite!==false) html+=`<div class="addrow"><button class="linkbtn" id="addItem">+ Add something that's not on the list</button></div>`;
   }
   listEl.innerHTML=html;
   listEl.querySelectorAll('details.sec').forEach(d=>d.addEventListener('toggle',()=>{ d.open?openSecs.add(d.dataset.sec):openSecs.delete(d.dataset.sec); }));
-  const ab=document.getElementById('addItem'); if(ab) ab.onclick=showNewItem;
+  const ab=document.getElementById('addItem'); if(ab) ab.onclick=()=>showNewItem('');
+  const at=document.getElementById('addThis'); if(at) at.onclick=()=>showNewItem(needle);
   listEl.querySelectorAll('.row[data-key]').forEach(b=>b.onclick=()=>pickItem(b.dataset.key));
+  listEl.querySelectorAll('.erow .rname').forEach(b=>b.onclick=()=>pickItem(b.closest('.erow').dataset.key));
   listEl.querySelectorAll('.row[data-ids]').forEach(b=>b.onclick=()=>select(b.dataset.ids));
+  listEl.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); removeItem(b.dataset.del); });
+  wireSteppers(listEl, (inp,val)=>setI(inp.id.slice(3),{count:val}));
   applyStyles(); renderPlan();
 }
-q.addEventListener('input',()=>{ if(!detailEl.hidden && !editing){ detailEl.hidden=true; listEl.hidden=false; selected=null; } render(); });
-q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const first=listEl.querySelector('.row'); if(first) first.click(); } if(e.key==='Escape'){ q.value=''; closeDetail(); render(); } });
+q.addEventListener('input',()=>{ if(!detailEl.hidden){ detailEl.hidden=true; listEl.hidden=false; selected=null; } render(); });
+q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const first=listEl.querySelector('.row,.rname'); if(first) first.click(); } if(e.key==='Escape'){ q.value=''; closeDetail(); render(); } });
 qclear.onclick=()=>{ q.value=''; closeDetail(); render(); q.focus(); };
 
-// ================= SAVING (shared store, with device-only fallback) =================
-let db=null, canWrite=null; const saveEl=document.getElementById('savestate');
+// ---------- Toast with undo ----------
+let toastTimer=null;
+function toast(msg, undo){
+  const t=document.getElementById('toast'); t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button id="tundo">Undo</button>':''}`; t.hidden=false;
+  if(undo) document.getElementById('tundo').onclick=()=>{ t.hidden=true; undo(); };
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true, undo?7000:2500);
+}
+
+// ================= SAVING =================
+// backend: 'claude' (Claude's shared store) · 'site' (GitHub website, password to edit) · 'local' (file on this computer)
+let db=null, canWrite=null, backend='local', editOn=false, ghToken=null, siteCfg=null; const saveEl=document.getElementById('savestate');
+const REPO='HaroldSarefield/NFP-Storage-Unit', BRANCH='main', DATA_FILE='data.json', CFG_FILE='editor-config.json';
 const LS='nfp-unit-edits-v1';
 function lsLoad(){ try{ const v=JSON.parse(localStorage.getItem(LS)||'{}'); Object.assign(ovC,v.c||{}); Object.assign(ovI,v.i||{}); }catch(e){} }
 function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({c:ovC,i:ovI})); }catch(e){} }
-function refreshAfterChange(changedIds){
-  changedIds.forEach(id=>{ if(byId[id]) build(id); }); applyStyles(); render();
-  
+function refreshAfterChange(changedIds){ changedIds.forEach(id=>{ if(byId[id]) build(id); }); applyStyles(); if(listEl.hidden===false) render(); else render(); }
+function status(t){ saveEl.textContent=t; }
+
+function setI(key, patch){ ovI[key]={...(ovI[key]||{}), ...patch, updatedAt:Date.now()}; persist('i',key,ovI[key]); if(!listEl.hidden) render(); }
+function setRawI(key, val){ if(val) ovI[key]=val; else delete ovI[key]; persist('i',key,val||null); }
+function setC(id, patch){ ovC[id]={...(ovC[id]||{}), ...patch, updatedAt:Date.now()}; persist('c',id,ovC[id]); }
+function setRawC(id, val){ if(val) ovC[id]=val; else delete ovC[id]; persist('c',id,val||null); }
+
+async function persist(kind,key,val){
+  if (backend==='claude' && db){
+    try{ status('Saving…'); const ref=db.doc((kind==='c'?'containers/':'inventory/')+key); val? await ref.set(val) : await ref.delete(); status('All changes saved'); }
+    catch(e){ if(e&&e.code==='invalid_argument'){ canWrite=false; setEdit(false); status('You can view this page but not edit it'); } else status('That change did not save. Check your connection.'); }
+  } else if (backend==='site'){ queueGh(kind,key,val); }
+  else { lsSave(); status('Saved on this computer only'); }
 }
-async function saveC(id,data){
-  if (data) ovC[id]=data; else delete ovC[id];
-  refreshAfterChange([id]); showDetail(id);
-  if (db){ try{ saveEl.textContent='Saving…'; data ? await db.doc('containers/'+id).set(data) : await db.doc('containers/'+id).delete(); saveEl.textContent='All edits saved'; }
-    catch(e){ readOnlyFail(e); } } else { lsSave(); saveEl.textContent='Saved on this device only'; }
+
+// ---- GitHub saving (website) ----
+const b64e = s => btoa(unescape(encodeURIComponent(s)));
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/\n/g,''))));
+const u8b64 = u => btoa(String.fromCharCode(...u)), b64u8 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+async function gh(path, opts={}, token=ghToken){
+  const r=await fetch('https://api.github.com/repos/'+REPO+path, {...opts, headers:{Accept:'application/vnd.github+json', Authorization:'Bearer '+token, ...(opts.body?{'Content-Type':'application/json'}:{})}});
+  return r;
 }
-async function saveI(key,data){
-  if (data) ovI[key]=data; else delete ovI[key];
-  refreshAfterChange([]); if(data) showInvDetail(key);
-  if (db){ try{ saveEl.textContent='Saving…'; data ? await db.doc('inventory/'+key).set(data) : await db.doc('inventory/'+key).delete(); saveEl.textContent='All edits saved'; }
-    catch(e){ readOnlyFail(e); } } else { lsSave(); saveEl.textContent='Saved on this device only'; }
+async function ghRead(file, token){ const r=await gh('/contents/'+file+'?ref='+BRANCH,{},token); if(r.status===404) return {sha:null,text:null}; if(!r.ok) throw new Error('read '+r.status); const j=await r.json(); return {sha:j.sha, text:b64d(j.content)}; }
+async function ghWrite(file, text, sha, message, token){ return gh('/contents/'+file,{method:'PUT', body:JSON.stringify({message, content:b64e(text), branch:BRANCH, ...(sha?{sha}:{})})},token); }
+let ghQueue=[], ghTimer=null, ghBusy=false;
+function queueGh(kind,key,val){ ghQueue.push({kind,key,val}); status('Saving…'); clearTimeout(ghTimer); ghTimer=setTimeout(flushGh, 900); }
+async function flushGh(){
+  if (ghBusy){ ghTimer=setTimeout(flushGh,600); return; }
+  if (!ghQueue.length) return; ghBusy=true; const ops=ghQueue.splice(0);
+  try{
+    for (let attempt=0; attempt<4; attempt++){
+      const cur=await ghRead(DATA_FILE); let data={c:{},i:{}}; try{ if(cur.text) data={c:{},i:{},...JSON.parse(cur.text)}; }catch(e){}
+      ops.forEach(o=>{ const m=o.kind==='c'?data.c:data.i; if(o.val) m[o.key]=o.val; else delete m[o.key]; });
+      const r=await ghWrite(DATA_FILE, JSON.stringify(data,null,1), cur.sha, `Update inventory (${ops.length} change${ops.length>1?'s':''})`);
+      if (r.ok){ status('Saved. Everyone sees it within a minute or two.'); ghBusy=false; return; }
+      if (r.status===401||r.status===403){ status('Saving was refused. The access key may have expired. Set up editing again.'); break; }
+      if (r.status!==409 && r.status!==422) break;
+    }
+    status('That change did not save. Check your connection and try again.'); ghQueue.unshift(...ops);
+  } catch(e){ status('That change did not save. Check your connection and try again.'); ghQueue.unshift(...ops); }
+  ghBusy=false;
 }
-function readOnlyFail(e){
-  if (e && e.code==='invalid_argument'){ canWrite=false; saveEl.textContent='You can view this page but not edit it'; render(); }
-  else if (e && e.code==='quota_exceeded') saveEl.textContent='Storage is full, so that edit was not saved';
-  else saveEl.textContent='Could not save that edit. Check your connection and try again.';
+// password → key that unlocks the saved GitHub access key (never stored in plain text)
+async function pwKey(pw, salt){ const base=await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:600000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']); }
+async function lockToken(token, pw){ const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv}, await pwKey(pw,salt), new TextEncoder().encode(token)));
+  return {v:1, salt:u8b64(salt), iv:u8b64(iv), ct:u8b64(ct)}; }
+async function unlockToken(cfg, pw){ const pt=await crypto.subtle.decrypt({name:'AES-GCM', iv:b64u8(cfg.iv)}, await pwKey(pw,b64u8(cfg.salt)), b64u8(cfg.ct)); return new TextDecoder().decode(pt); }
+
+// ---------- Edit mode + login ----------
+const editBtn=document.getElementById('editbtn'), editBar=document.getElementById('editbar'), modal=document.getElementById('modal');
+function setEdit(on){
+  editOn=on; editBtn.textContent = on ? 'Done editing' : (backend==='site' ? 'Editor login' : 'Edit');
+  editBtn.classList.toggle('primary', on);
+  editBar.hidden=!on;
+  editBar.innerHTML = on ? `<b>Editing is on.</b> ${backend==='site'?'Changes save to the website for everyone.':backend==='claude'?'Changes save for everyone with the link.':'Changes save on this computer only.'}${backend==='site'?' <button class="linkbtn" id="chpw">Change password</button>':''}` : '';
+  const cp=document.getElementById('chpw'); if(cp) cp.onclick=()=>openModal('change');
+  if(!detailEl.hidden) closeDetail(); render();
 }
+editBtn.onclick=()=>{ if(editOn){ setEdit(false); return; } if(backend==='site' && !ghToken){ openModal('login'); return; } setEdit(true); };
+function openModal(stepName){
+  modal.hidden=false; const box=modal.querySelector('.mbox');
+  if (stepName==='login'){
+    box.innerHTML=`<h2>Editor login</h2><p class="subtle">Anyone with the link can look. Only people with the password can make changes.</p>
+      <form id="mf" class="edit"><label for="m-pw">Password<input id="m-pw" type="password" autocomplete="current-password" required></label><p class="merr" id="merr"></p>
+      <div class="actions"><button class="btn primary" type="submit">Unlock editing</button><button class="btn" type="button" id="mcancel">Cancel</button></div></form>
+      ${siteCfg?'':'<p class="subtle">Editing hasn\'t been set up yet. <button class="linkbtn" id="msetup">Set it up (owner only)</button></p>'}`;
+    const pw=document.getElementById('m-pw'); pw.focus();
+    document.getElementById('mf').onsubmit=async e=>{ e.preventDefault(); const err=document.getElementById('merr'); err.textContent='Checking…';
+      if(!siteCfg){ err.textContent='Editing isn\'t set up yet. Use "Set it up" below.'; return; }
+      try{ const tok=await unlockToken(siteCfg, pw.value); const r=await gh('',{},tok); if(!r.ok) throw new Error('key'); ghToken=tok; closeModal(); setEdit(true); await pullLatest(); toast('Editing unlocked'); }
+      catch(x){ err.textContent = x.message==='key' ? 'The password worked, but GitHub refused the access key. It may have expired. Set up editing again.' : 'That password is not right.'; } };
+    const st=document.getElementById('msetup'); if(st) st.onclick=()=>openModal('setup');
+  } else if (stepName==='setup' || stepName==='change'){
+    const isSetup=stepName==='setup';
+    box.innerHTML=`<h2>${isSetup?'Set up editing':'Change the password'}</h2>
+      ${isSetup?`<p class="subtle">This connects the website to your GitHub repo so changes save for everyone. You need a GitHub access key:</p>
+      <ol class="subtle"><li>On GitHub, open Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
+      <li>Repository access: <b>Only select repositories</b> → <b>NFP-Storage-Unit</b>.</li><li>Permissions → Repository → <b>Contents: Read and write</b>.</li><li>Generate it and paste it below.</li></ol>`:''}
+      <form id="mf" class="edit">
+        ${isSetup?'<label for="m-tok">GitHub access key<input id="m-tok" type="password" autocomplete="off" required></label>':''}
+        <label for="m-pw1">New editing password<input id="m-pw1" type="password" autocomplete="new-password" minlength="10" required></label>
+        <label for="m-pw2">Type it again<input id="m-pw2" type="password" autocomplete="new-password" minlength="10" required></label>
+        <p class="subtle">Use at least 10 characters. A few random words works well. Share it only with people who should edit.</p>
+        <p class="merr" id="merr"></p>
+        <div class="actions"><button class="btn primary" type="submit">${isSetup?'Save and turn on editing':'Change password'}</button><button class="btn" type="button" id="mcancel">Cancel</button></div></form>`;
+    document.getElementById('mf').onsubmit=async e=>{ e.preventDefault(); const err=document.getElementById('merr');
+      const p1=document.getElementById('m-pw1').value, p2=document.getElementById('m-pw2').value; if(p1!==p2){ err.textContent='The two passwords don\'t match.'; return; }
+      const tok = isSetup ? document.getElementById('m-tok').value.trim() : ghToken; err.textContent='Saving…';
+      try{ const r=await gh('',{},tok); if(!r.ok){ err.textContent='GitHub didn\'t accept that access key. Check it has access to NFP-Storage-Unit.'; return; }
+        const cfg=await lockToken(tok,p1); const cur=await ghRead(CFG_FILE,tok);
+        const w=await ghWrite(CFG_FILE, JSON.stringify(cfg), cur.sha, isSetup?'Set up editing':'Change editing password', tok);
+        if(!w.ok){ err.textContent='GitHub refused to save. Make sure the key has "Contents: Read and write".'; return; }
+        siteCfg=cfg; ghToken=tok; closeModal(); setEdit(true); toast(isSetup?'Editing is set up':'Password changed'); }
+      catch(x){ err.textContent='Something went wrong talking to GitHub. Try again.'; } };
+  }
+  const mc=document.getElementById('mcancel'); if(mc) mc.onclick=closeModal;
+}
+function closeModal(){ modal.hidden=true; modal.querySelector('.mbox').innerHTML=''; }
+modal.addEventListener('click',e=>{ if(e.target===modal) closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !modal.hidden) closeModal(); });
+
+async function pullLatest(){ // editors read straight from GitHub so they always start from the newest data
+  try{ const cur=await ghRead(DATA_FILE); if(cur.text){ const d=JSON.parse(cur.text); applyData(d); } }catch(e){}
+}
+function applyData(d){ Object.keys(ovC).forEach(k=>delete ovC[k]); Object.keys(ovI).forEach(k=>delete ovI[k]); Object.assign(ovC,d.c||{}); Object.assign(ovI,d.i||{}); refreshAfterChange(C.map(c=>c.id)); }
+
 async function connect(){
-  if (!window.claude || !window.claude.use){ lsLoad(); saveEl.textContent='Edits save on this device only'; refreshAfterChange(C.map(c=>c.id)); return; }
+  const onSite = location.protocol.startsWith('http') && !(window.claude && window.claude.use);
+  if (onSite){
+    backend='site'; setEdit(false); status('Loading…');
+    try{ const r=await fetch(DATA_FILE+'?v='+Date.now(),{cache:'no-store'}); if(r.ok) applyData(await r.json()); }catch(e){}
+    try{ const r=await fetch(CFG_FILE+'?v='+Date.now(),{cache:'no-store'}); if(r.ok) siteCfg=await r.json(); }catch(e){}
+    status('View only'); return;
+  }
+  if (!window.claude || !window.claude.use){ backend='local'; lsLoad(); setEdit(false); status('Edits save on this computer only'); refreshAfterChange(C.map(c=>c.id)); return; }
   try{ db = await window.claude.use('db'); }catch(e){ db=null; }
   try{ const user = await window.claude.use('user'); if(user){ const c=await user.can('data.write'); if(c===false) canWrite=false; } }catch(e){}
-  if (!db){ lsLoad(); saveEl.textContent='Edits save on this device only'; refreshAfterChange(C.map(c=>c.id)); return; }
-  saveEl.textContent = canWrite===false ? 'View only' : 'Loading saved edits…';
-  const timer=setTimeout(()=>{ saveEl.textContent='Saved edits can’t be reached yet'; },10000);
+  if (!db){ backend='local'; lsLoad(); setEdit(false); status('Edits save on this device only'); refreshAfterChange(C.map(c=>c.id)); return; }
+  backend='claude'; setEdit(false); editBtn.hidden = canWrite===false;
+  status(canWrite===false ? 'View only' : 'Loading saved changes…');
+  const timer=setTimeout(()=>status('Saved changes can’t be reached yet'),10000);
   db.collection('containers').onSnapshot(snap=>{
     if(!snap.metadata.fromCache) clearTimeout(timer);
     const changed=[]; snap.docChanges().forEach(ch=>{ const id=ch.doc.id; if(ch.type==='removed') delete ovC[id]; else ovC[id]=ch.doc.data(); changed.push(id); });
     if(changed.length) refreshAfterChange(changed);
-    if(!snap.metadata.fromCache && canWrite!==false) saveEl.textContent='All edits saved';
-  }, e=>{ clearTimeout(timer); saveEl.textContent='Saved edits are unavailable right now'; });
+    if(!snap.metadata.fromCache && !/Saving/.test(saveEl.textContent)) status(canWrite===false?'View only':'Up to date');
+  }, ()=>{ clearTimeout(timer); status('Saved changes are unavailable right now'); });
   db.collection('inventory').onSnapshot(snap=>{
     let n=0; snap.docChanges().forEach(ch=>{ const k=ch.doc.id; if(ch.type==='removed') delete ovI[k]; else ovI[k]=ch.doc.data(); n++; });
-    if(n) refreshAfterChange([]);
+    if(n && !(editOn && !detailEl.hidden)) refreshAfterChange([]);
   }, ()=>{});
-  render();
 }
 
 // ================= LOOP =================
