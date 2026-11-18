@@ -640,8 +640,9 @@ const B = {
     const st=new THREE.Mesh(new THREE.PlaneGeometry(w,d),stain); st.rotation.x=Math.PI/2; st.position.set(0,h/2-0.01,0); st.userData.id=c.id; g.add(st);
     const r=rng(c.id), drip=STD('#7a4a22',{r:.4,t:true,op:.75}); for(let k=0;k<5;k++){ const dlen=0.08+r()*0.25; add(g,new THREE.CylinderGeometry(0.012,0.004,dlen,5),drip,(r()-.5)*w*0.6,h/2-dlen/2,(r()-.5)*d*0.6); }
     const warn=new THREE.MeshBasicMaterial({map:warnTex(), transparent:true, side:THREE.DoubleSide, toneMapped:false}); warn.userData.op=1; warn.userData.tr=true;
-    const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.75),warn); sg.position.set(-w*0.5-0.05,-0.35,0); sg.rotation.y=-Math.PI/2; sg.userData.id=c.id; g.add(sg); // faces the aisle
-    const wire=STD('#333'); add(g,new THREE.CylinderGeometry(0.008,0.008,0.4,4),wire,-w*0.5-0.05,h/2-0.2,0.5); add(g,new THREE.CylinderGeometry(0.008,0.008,0.4,4),wire,-w*0.5-0.05,h/2-0.2,-0.5);
+    const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.7,0.85),warn); sg.position.set(-w*0.5+0.1,-0.45,-d*0.5); sg.userData.id=c.id; g.add(sg); // aimed at the door so it's visible from the entry
+    { const wp=new THREE.Vector3(); g.updateMatrixWorld(); sg.getWorldPosition(wp); const door=new THREE.Vector3(W/2,5,0); sg.rotation.y=Math.atan2(door.x-wp.x, door.z-wp.z) - g.rotation.y; }
+    const wire=STD('#333'); add(g,new THREE.CylinderGeometry(0.008,0.008,0.6,4),wire,-w*0.5-0.25,h/2-0.25,-d*0.5); add(g,new THREE.CylinderGeometry(0.008,0.008,0.6,4),wire,-w*0.5+0.45,h/2-0.25,-d*0.5-0.2);
   },
   drawers(c,g,w,h,d){
     const each=0.55, n=Math.floor(h/each), r=rng(c.id);
