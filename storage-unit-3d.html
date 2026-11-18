@@ -1,0 +1,1183 @@
+<title>NFP Storage Unit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Kalam:wght@400;700&display=swap">
+<style>
+/* Layout: full-height app — 3D/2D stage on the left with view, layer and walk controls; find/inventory/edit panel on the right; stacks on phones. */
+:root{
+  --bg:#eef0ec; --surface:#ffffff; --surface-2:#f5f6f2; --line:#d8dbd3;
+  --fg:#1f2320; --muted:#5d645d; --accent:#e8287f; --accent-ink:#ffffff;
+  --sticky:#ff4fa3; --ok:#2f7d4f; --warn:#a86a00; --unk:#7b7f86; --scene:#e4e6e1;
+  --plan-bg:#f3f4f0; --plan-line:#c9ccc4;
+  --f-display:"Archivo",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace; --f-hand:"Kalam","Comic Sans MS",cursive;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141714; --surface:#1c201c; --surface-2:#232823; --line:#323832;
+  --fg:#e8ebe6; --muted:#9aa29a; --accent:#ff5aa0; --accent-ink:#1a0a12;
+  --ok:#5cc489; --warn:#e2a93b; --unk:#9ba0a8; --scene:#1a1d1a; --plan-bg:#191c19; --plan-line:#353b35; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141714; --surface:#1c201c; --surface-2:#232823; --line:#323832;
+  --fg:#e8ebe6; --muted:#9aa29a; --accent:#ff5aa0; --accent-ink:#1a0a12;
+  --ok:#5cc489; --warn:#e2a93b; --unk:#9ba0a8; --scene:#1a1d1a; --plan-bg:#191c19; --plan-line:#353b35; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;gap:10px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px}
+h1{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.01em;margin:0}
+header p{margin:0;color:var(--muted);font-size:13px}
+#savestate{font-size:12px;color:var(--muted)}
+.main{display:grid;grid-template-columns:380px minmax(0,1fr);gap:12px;min-height:0}
+.stagewrap{display:grid;grid-template-rows:auto 1fr;gap:8px;min-height:0;min-width:0}
+.bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surface);overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:5px 11px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.seg-label{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--scene);min-height:360px}
+#view{position:absolute;inset:0;touch-action:none}
+#plan{position:absolute;inset:0;background:var(--plan-bg);display:flex;align-items:center;justify-content:center;padding:14px}
+#plan svg{width:100%;height:100%;display:block}
+.overlay{position:absolute;z-index:2;display:flex;gap:6px;flex-wrap:wrap}
+.views{left:10px;top:10px;max-width:calc(100% - 20px)}
+.chip{font:500 12px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:5px 10px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.door{position:absolute;left:10px;bottom:10px;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--line);padding:3px 8px;border-radius:6px;pointer-events:none;z-index:2}
+.hint{position:absolute;right:10px;top:48px;font-size:11px;color:var(--muted);pointer-events:none;text-align:right;max-width:240px;z-index:2;background:color-mix(in srgb,var(--surface) 80%,transparent);padding:4px 8px;border-radius:6px}
+.pad{position:absolute;right:12px;bottom:12px;z-index:3;display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px}
+.pad button{border:1px solid var(--line);background:var(--surface);border-radius:10px;font-size:18px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad button:active,.pad button.on{background:var(--fg);color:var(--bg)}
+.pad .up{grid-column:2;grid-row:1}.pad .left{grid-column:1;grid-row:2}.pad .right{grid-column:3;grid-row:2}.pad .down{grid-column:2;grid-row:3}
+.pad .rise{grid-column:3;grid-row:1;font-size:12px}.pad .fall{grid-column:3;grid-row:3;font-size:12px}
+.tip{position:absolute;pointer-events:none;z-index:4;background:var(--fg);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(10px,10px)}
+.panel{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.search{padding:12px;border-bottom:1px solid var(--line);display:grid;gap:8px}
+.search input{width:100%;font-size:15px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2)}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;font:600 12px var(--f-body);padding:7px 6px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--surface-2);border-color:var(--line);color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.scroll{overflow:auto;min-height:0;flex:1}
+.detail{padding:14px;flex:1;min-height:0;overflow:auto}
+.note{display:inline-block;background:var(--sticky);color:#2a0716;font-family:var(--f-hand);font-weight:700;font-size:18px;line-height:1.15;padding:8px 10px;transform:rotate(-1.5deg);box-shadow:0 2px 0 rgba(0,0,0,.15);max-width:100%}
+.note.faint{background:#ffb3d6;font-weight:400;font-style:italic}
+.detail h2{font:700 16px var(--f-display);margin:10px 0 2px}
+.meta{font-size:12px;color:var(--muted)}
+.detail ul{margin:8px 0 0;padding-left:18px}
+.detail li{margin:2px 0}
+.dtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.icon{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:2px 4px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+form.edit{display:grid;gap:10px;margin-top:10px}
+form.edit label{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+form.edit input[type=text],form.edit input:not([type]),form.edit textarea,form.edit select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-size:14px;font-weight:400;color:var(--fg)}
+form.edit textarea{min-height:92px;resize:vertical}
+form.edit .check{display:flex;gap:8px;align-items:center;font-weight:500;color:var(--fg)}
+.group{padding:10px 14px 4px;font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;top:0;background:var(--surface);z-index:1;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:9px 14px;border:0;border-bottom:1px solid var(--line);cursor:pointer;background:transparent;width:100%;text-align:left}
+.row:hover{background:var(--surface-2)}
+.row .n{font-weight:500;min-width:0}
+.row .c{font:500 14px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.row .s{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;color:var(--muted)}
+.was{color:var(--warn);font-weight:600}
+.pill{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.seen{color:var(--ok)} .pill.likely{color:var(--warn)} .pill.unknown{color:var(--unk)} .pill.edited{color:var(--accent)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)}
+.empty{padding:20px 14px;color:var(--muted)}
+.addrow{padding:10px 14px;border-bottom:1px solid var(--line)}
+.ask{font:800 18px var(--f-display);letter-spacing:-.01em}
+.qwrap{position:relative}
+.qwrap input{padding-right:36px!important;font-size:17px!important;padding-block:12px!important;border:2px solid var(--line)!important}
+.qwrap input:focus{border-color:var(--accent)!important;outline:none}
+.qclear{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:22px;color:var(--muted);cursor:pointer;padding:4px 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.ctl{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.ctl select{font-size:13px;font-weight:500;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 10px}
+.where{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:12px;align-items:start;margin-top:8px}
+.where .big{font:800 17px var(--f-display);line-height:1.2;margin:0 0 4px}
+.where p{margin:0 0 6px}
+.mini{width:112px;height:auto;display:block}
+.count{font:600 24px var(--f-mono);font-variant-numeric:tabular-nums}
+.back{border:0;background:transparent;color:var(--accent);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+details.sec>summary{list-style:none;cursor:pointer;padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;font-weight:600}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary .subtle{margin-left:auto;margin-right:10px} details.sec>summary::after{content:"＋";color:var(--muted)} details.sec[open]>summary::after{content:"－"}
+.hdr{padding:10px 14px 6px;font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.subtle{font-size:12px;color:var(--muted)}
+.linkbtn{border:0;background:transparent;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
+@media (max-width:900px){
+  .app{height:auto;grid-template-rows:auto auto}
+  .main{grid-template-columns:1fr}
+  .stage{height:64vh}
+  .scroll{max-height:70vh}
+  .detail{max-height:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header>
+    <h1>NFP Storage Unit</h1>
+    <p>Type what you need and the model shows you where it is.</p>
+    <span id="savestate">Connecting…</span>
+  </header>
+  <div class="main">
+    <aside class="panel">
+      <div class="search">
+        <label for="q" class="ask">What are you looking for?</label>
+        <div class="qwrap"><input id="q" type="search" placeholder="Try “diapers”, “baby scale” or “frames”" autocomplete="off"><button class="qclear" id="qclear" aria-label="Clear search" hidden>×</button></div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="detail" id="detail" hidden></div>
+      <div class="scroll" id="list"></div>
+    </aside>
+    <div class="stagewrap">
+      <div class="bar">
+        <div class="seg" role="group" aria-label="Display">
+          <button id="m-3d" aria-pressed="true">3D</button>
+          <button id="m-2d" aria-pressed="false">Floor plan</button>
+        </div>
+        <label class="ctl" for="viewsel">View
+          <select id="viewsel"><option value="door">From the door</option><option value="top">From above</option><option value="left">Left wall</option><option value="right">Right wall</option><option value="back">Back wall</option><option value="" hidden>Custom</option></select></label>
+        <label class="ctl" for="layersel">Show
+          <select id="layersel"></select></label>
+        <button class="chip" id="nav-walk" aria-pressed="false">Walk around</button>
+        <button class="chip" id="t-float" aria-pressed="false">Labels on top</button>
+      </div>
+      <div class="stage" id="stage">
+        <div id="view" aria-label="3D model of the storage unit"></div>
+        <div id="plan" hidden></div>
+        <div class="door">▲ Door</div>
+        <div class="hint" id="hint">Drag to turn · scroll or pinch to zoom · click any box</div>
+        <div class="pad" id="pad" hidden aria-label="Walk controls">
+          <button class="up" data-k="f" aria-label="Walk forward">▲</button>
+          <button class="left" data-k="l" aria-label="Step left">◀</button>
+          <button class="right" data-k="r" aria-label="Step right">▶</button>
+          <button class="down" data-k="b" aria-label="Walk back">▼</button>
+          <button class="rise" data-k="u" aria-label="Raise view">up</button>
+          <button class="fall" data-k="d" aria-label="Lower view">dn</button>
+        </div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ================= DATA =================
+const W = 10, D = 15, H = 8; // feet (estimated)
+// x = 0 left wall → 10 right wall (standing at the door looking in); z = 0 door → 15 back; y up.
+const COL = { olive:'#6b6b3c', blue:'#2f5d8a', grey:'#73777b', purple:'#5c4ea0', clear:'#cfe2ea', card:'#b38b5b', usps:'#f1efe9',
+  printer:'#3b3e43', white:'#ecece7', pink:'#e590b3', green:'#69c14a', black:'#232427', silver:'#a2a7ad', orange:'#e07a2e', canvas:'#e2d6bd', fp:'#3a8fd0', walmart:'#c9a46a' };
+
+const C = [
+  {id:'printers', kind:'printers', tag:'Printers', zone:'Front-left corner', title:'Printer stack', sticky:null, col:COL.printer, p:[0.1,0,0.3], s:[1.6,3.0,1.6], face:'+x', t:'0:00', items:['4 laser printers (2 dark grey Brother, 2 white)','Sheet says 10 printers total'], conf:'seen'},
+  {id:'toner', kind:'retail', art:'toner', count:3, zone:'Front-left corner', title:'Brother toner boxes', sticky:null, col:COL.white, band:'#1f4fa0', p:[0.1,3.0,0.3], s:[1.6,0.7,1.6], face:'+x', t:'0:01', items:['Brother TN-850 toner','Brother 227 toner'], conf:'seen'},
+  {id:'basket', kind:'basket', zone:'Front-left corner', title:'Green basket', sticky:null, col:COL.green, p:[1.7,3.0,0.5], s:[0.6,0.5,0.6], face:'+x', t:'0:00', items:['Pens, markers and small office supplies'], conf:'seen'},
+  {id:'dvd', kind:'tote', zone:'Front-left corner', title:'DVD writer & cords tub', sticky:'DVD writer & cords', col:COL.blue, p:[0.1,3.7,0.3], s:[1.6,0.8,1.6], face:'+x', t:'0:06', items:['DVD writer','Cords'], conf:'seen'},
+  {id:'laptopbag', kind:'hardcase', zone:'Front-left corner', title:'Projector case', sticky:'Projector', col:COL.black, p:[0.1,4.5,0.3], s:[1.6,0.8,1.6], face:'+x', t:'0:07', items:['Projector (black carry case)'], conf:'seen'},
+  {id:'cords', kind:'bag', zone:'Front-left corner', title:'Misc. cords bag', sticky:'Misc. cords', col:COL.green, p:[0.2,5.3,0.4], s:[1.4,1.1,1.4], face:'+x', t:'0:09', items:['Miscellaneous cords and adapters'], conf:'seen'},
+
+  {id:'la1', kind:'tote', zone:'Left wall · Stack A (front)', title:'Crafts tote', sticky:'Crafts · paper bags', col:COL.olive, p:[0.1,0,2.0], s:[1.8,1.5,2.75], face:'+x', t:'0:18', items:['Crafts','Paper bags'], conf:'seen'},
+  {id:'la2', kind:'tote', zone:'Left wall · Stack A (front)', title:'Toys & crafts tote', sticky:'Toys & crafts', col:COL.olive, p:[0.1,1.5,2.0], s:[1.8,1.5,2.75], face:'+x', t:'0:15', items:['Toys','Crafts'], conf:'seen'},
+  {id:'la3', kind:'tote', zone:'Left wall · Stack A (front)', title:'Models tote', sticky:'MODELS · Breastfeeding, Tooth Health, Prenatal, Contracept. Info', col:COL.olive, p:[0.1,3.0,2.0], s:[1.8,1.5,2.75], face:'+x', t:'0:13', items:['Teaching models: breastfeeding, tooth health, prenatal','Contraceptive info','Likely: BF models, fetal model, placenta, fast food, tooth decay, food calorie, PP/Prenatal/BF boxes, safe sleep flip books, baby bellies, domino effect'], conf:'seen'},
+  {id:'lb1', kind:'tote', zone:'Left wall · Stack B', title:'Toys & misc crafts tote', sticky:'Toys · Misc. crafts & decorations', col:COL.olive, p:[0.1,0,4.85], s:[1.8,1.5,2.75], face:'+x', t:'0:25', items:['Toys','Misc. crafts','Decorations','Was the CPR tote (CPR is crossed out on the label)'], conf:'seen'},
+  {id:'lb2', kind:'tote', zone:'Left wall · Stack B', title:'Diapers tote', sticky:'Diapers', col:COL.olive, p:[0.1,1.5,4.85], s:[1.8,1.5,2.75], face:'+x', t:'0:24', items:['Diapers'], conf:'seen'},
+  {id:'lb3', kind:'tote', zone:'Left wall · Stack B', title:'NFP water bottles tote', sticky:'NFP water bottles', col:COL.olive, p:[0.1,3.0,4.85], s:[1.8,1.5,2.75], face:'+x', t:'0:22', items:['NFP-branded water bottles'], conf:'seen'},
+  {id:'monitors', kind:'monitors', tag:'Monitors', zone:'Left wall · Stack B', title:'Computer monitors', sticky:null, col:COL.black, p:[0.2,4.5,2.1], s:[1.2,1.4,5.4], face:'+x', t:'0:10', items:['About 10 flat monitors standing upright on top of stacks A and B'], conf:'seen'},
+
+  {id:'bl1', kind:'clear', lid:'#f2f2ee', zone:'Left wall · Purple tower', title:'Clear bin (bottom)', sticky:'Baby health care & grooming kits', col:COL.clear, p:[0.1,0,7.75], s:[1.9,1.2,2.2], face:'+x', t:'0:39', items:['Baby health care items','Grooming kits'], conf:'seen'},
+  {id:'bl2', kind:'tote', zone:'Left wall · Purple tower', title:'Grey tote', sticky:'Tape measures · BP monitors · NFP magnets · Wedding cards · NFP folders', col:COL.grey, p:[0.1,1.2,7.75], s:[1.9,1.2,2.2], face:'+x', t:'0:37', items:['Tape measures','BP monitors','NFP magnets','Wedding cards','NFP folders'], conf:'seen'},
+  {id:'bl3', kind:'tote', zone:'Left wall · Purple tower', title:'Purple tote', sticky:'Toys', col:COL.purple, p:[0.15,2.4,7.8], s:[1.8,0.9,2.1], face:'+x', t:'0:36', items:['Toys'], conf:'seen'},
+  {id:'bl4', kind:'tote', zone:'Left wall · Purple tower', title:'Purple tote', sticky:'Toys', col:COL.purple, p:[0.15,3.3,7.8], s:[1.8,0.9,2.1], face:'+x', t:'0:35', items:['Toys'], conf:'seen'},
+  {id:'bl5', kind:'tote', zone:'Left wall · Purple tower', title:'Grey tote', sticky:'Ages & Stages questionnaires', col:COL.grey, p:[0.1,4.2,7.75], s:[1.9,1.1,2.2], face:'+x', t:'0:34', items:['Ages & Stages questionnaires (label is blurry; best reading)'], conf:'seen'},
+  {id:'bl6', kind:'tote', zone:'Left wall · Purple tower', title:'Grey tote (top)', sticky:'Grad caps', col:COL.grey, p:[0.1,5.3,7.75], s:[1.9,1.1,2.2], face:'+x', t:'0:33', items:['Graduation caps'], conf:'seen'},
+  {id:'bl7', kind:'bag', zone:'Left wall · Purple tower', title:'Canvas tote bag (Brookes Publishing)', sticky:'Developmental toys · Preschool', col:COL.canvas, trim:'#1d2433', p:[0.3,6.4,8.05], s:[1.4,1.1,1.5], face:'+x', t:'0:30', items:['Developmental toys','Preschool materials'], conf:'seen'},
+  {id:'craft', kind:'clear', lid:'#c6e04a', count:2, zone:'Left wall · Purple tower', title:'Clear crafting bins (2)', sticky:'Crafting · Beads · Coloring', col:COL.clear, p:[0.2,0,10.05], s:[1.4,1.7,1.25], face:'+x', t:'0:40', items:['Crafting supplies','Beads','Coloring books and markers','Two stacked bins on the floor, just past the purple tower'], conf:'seen'},
+
+  {id:'leak', kind:'hazard', noLayer:true, tag:'Water damage on ceiling', zone:'Back-left corner', title:'Water damage on the ceiling', sticky:null, col:'#8a5a2b', p:[0.05,7.55,10.9], s:[2.7,0.45,2.6], face:'+x', t:'0:42', items:['The ceiling above the clear stacking bins has water damage','Check these bins and the boxes below for moisture, and keep paper items out of this corner'], conf:'seen'},
+  {id:'drawers', kind:'drawers', zone:'Back-left corner', title:'Clear stacking bins', sticky:null, col:COL.clear, p:[0.1,0,11.4], s:[1.8,6.6,1.85], face:'+x', t:'0:43', items:['Tall column of small clear lidded bins','Small supplies; individual labels not readable','Water damage on the ceiling right above these bins'], conf:'seen'},
+  {id:'brown', kind:'boxwall', zone:'Back wall', title:'Back wall boxes (left side)', sticky:null, col:COL.card, p:[2.0,0,13.3], s:[3.6,6.0,1.7], face:'-z', t:'0:46', items:['Floor-to-ceiling boxed items from the inventory list','More seats, potties, pack n plays and smaller things like socks, toothbrushes, sippy cups, plates, snack bowls and home safety kits'], conf:'likely'},
+  {id:'pumps', kind:'boxrow', zone:'Back wall', title:'Grey boxes with round graphics', sticky:null, col:'#9ea3a6', p:[2.0,6.0,13.3], s:[3.6,1.3,1.7], face:'-z', t:'0:46', items:['Top row of grey retail boxes','Look like breast pump boxes (15 + 1 demo on the sheet)'], conf:'likely'},
+  {id:'orange', kind:'boxcol', zone:'Back wall', title:'Orange boxes', sticky:null, col:COL.orange, p:[5.6,0,13.3], s:[1.6,7.0,1.7], face:'-z', t:'0:48', items:['Tall column of orange product boxes','Likely puzzles (111 on the sheet)'], conf:'likely'},
+  {id:'large', kind:'boxwall', big:true, zone:'Back wall', title:'Back wall big gear (right side)', sticky:null, col:COL.card, p:[7.55,0,11.7], s:[2.4,6.2,3.25], face:'-z', t:'0:49', items:['Large boxed baby gear from the inventory list','Floor seats, potties / toilets, pack n plays, exersaucers, strollers, activity tables, cribs and more'], conf:'likely'},
+  {id:'frames-photo', kind:'retail', art:'skyline', zone:'Back-center floor', title:'Photo frames box', sticky:'Photo frames', col:COL.white, band:'#4b3d8f', p:[5.5,0,11.6], s:[2.0,1.3,1.5], face:'-z', t:'0:57', items:['Picture frames (about 30)'], conf:'seen'},
+  {id:'frames-cert', kind:'openbox', zone:'Back-center floor', title:'Certificate frames box', sticky:'Certificate frames', col:COL.card, p:[5.6,1.3,11.65], s:[1.8,1.4,1.4], face:'-z', t:'0:54', items:['Certificate frames (50), in their own box'], conf:'seen'},
+  {id:'chairs', kind:'chairs', zone:'Back-center floor', title:'Folding chairs & easel', sticky:null, col:COL.black, p:[7.6,0,9.95], s:[0.5,3.0,1.6], face:'-z', t:'1:03', items:['Black folding chairs','Black easel / stand'], conf:'seen'},
+
+  {id:'potties', kind:'swings', tag:'Outdoor swings', zone:'Right wall · back corner', title:'Outdoor baby swings', sticky:null, col:COL.pink, p:[8.2,0,9.65], s:[1.7,4.6,1.9], face:'-x', t:'0:58', items:['Stack of pink and blue outdoor bucket swings with ropes','Sheet: 9 girl (pink) + 76 more'], conf:'seen'},
+  {id:'packs', kind:'bumbo', tag:'Bumbo floor seats', zone:'Right wall · back corner', title:'Bumbo floor seats', sticky:null, col:COL.white, p:[8.4,0,8.40], s:[1.5,6.2,1.2], face:'-x', t:'1:01', items:['Tall stack of boxed Bumbo floor seats in plastic wrap','Sheet: 15 Bumbo seats'], conf:'seen'},
+  {id:'r-books', kind:'tote', zone:'Right wall · tub stack', title:'Grey tote (bottom)', sticky:'BOOKS · mom, baby, home nurse', col:COL.grey, p:[8.2,0,6.35], s:[1.8,1.3,2.0], face:'-x', t:'1:12', items:['Books for moms, babies and home nurses','Likely includes the Dr. Seuss and educational books'], conf:'seen'},
+  {id:'r-scan', kind:'tote', zone:'Right wall · tub stack', title:'Blue tote', sticky:'Scanners & keyboards', col:COL.blue, p:[8.2,1.3,6.35], s:[1.8,1.3,2.0], face:'-x', t:'1:09', items:['Scanners','Keyboards'], conf:'seen'},
+  {id:'r-bags', kind:'tote', zone:'Right wall · tub stack', title:'Blue tote', sticky:'NFP bags & backpacks', col:COL.blue, p:[8.2,2.6,6.35], s:[1.8,1.3,2.0], face:'-x', t:'1:07', items:['NFP bags','NFP backpacks'], conf:'seen'},
+  {id:'r-tubs', kind:'tubs', zone:'Right wall · tub stack', title:'Baby bath demo tubs', sticky:null, col:COL.pink, p:[8.3,3.9,6.45], s:[1.6,1.7,1.8], face:'-x', t:'1:04', items:['Stacked pink, yellow and blue baby tubs with demo dolls inside (5 demo tubs on the sheet)'], conf:'seen'},
+  {id:'r-top', kind:'packs', zone:'Right wall · tub stack', title:'Bagged white packs', sticky:null, col:COL.white, p:[8.4,5.6,6.55], s:[1.4,0.9,1.6], face:'-x', t:'1:04', items:['More plastic-wrapped white packs on top'], conf:'seen'},
+  {id:'ro1', kind:'tote', zone:'Right wall · olive stack', title:'Toys & potty chairs tote', sticky:'TOYS & POTTY CHAIRS', col:COL.olive, p:[8.1,0,3.55], s:[1.8,1.5,2.75], face:'-x', t:'1:27', items:['Toys','Potty chairs'], conf:'seen'},
+  {id:'ro2', kind:'tote', zone:'Right wall · olive stack', title:'Extra models tote', sticky:'Extra models, thermometers, stethoscopes, CPR', col:COL.olive, p:[8.1,1.5,3.55], s:[1.8,1.5,2.75], face:'-x', t:'1:25', items:['Extra teaching models','Thermometers','Stethoscopes','CPR mannequins (1 adult, 2 infant)'], conf:'seen'},
+  {id:'ro3', kind:'tote', zone:'Right wall · olive stack', title:'Party tote', sticky:'Party', col:COL.olive, p:[8.1,3.0,3.55], s:[1.8,1.5,2.75], face:'-x', t:'1:21', items:['Party supplies'], conf:'seen'},
+  {id:'ro-bags', kind:'duffels', count:5, tag:'Baby scales in bags · adult scales on top', zone:'Right wall · olive stack', title:'Blue bags with baby scales (5)', sticky:null, col:'#2b4fb8', p:[8.2,4.5,3.60], s:[1.6,1.3,1.6], face:'-x', t:'1:15', items:['5 blue zip bags stacked on the Party tote','Each holds a baby scale'], conf:'seen'},
+  {id:'adultscales', kind:'scales', count:3, zone:'Right wall · olive stack', title:'Adult scales (loose)', sticky:null, col:'#2a2c30', p:[8.25,5.8,3.65], s:[1.5,0.35,1.5], face:'-x', t:'1:18', items:['Adult bathroom-style scales scattered on top of the blue bags'], conf:'seen'},
+  {id:'bpcuffs', kind:'clear', lid:'#3d4a55', zone:'Right wall · olive stack', title:'Clear bin', sticky:'BP cuffs', col:COL.clear, p:[8.3,4.5,5.30], s:[1.4,0.8,0.95], face:'-x', t:'1:18', items:['Blood pressure cuffs'], conf:'seen'},
+  {id:'adultscale2', kind:'scales', count:1, zone:'Right wall · olive stack', title:'Adult scale (on BP cuffs bin)', sticky:null, col:'#2a2c30', p:[8.35,5.3,5.33], s:[1.2,0.2,0.9], face:'-x', t:'1:18', items:['Another adult scale sitting on the BP cuffs bin'], conf:'seen'},
+  {id:'u1', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box', sticky:'Pots · Child Abuse Prevention Month', col:COL.usps, p:[8.25,4.40,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:36', items:['Flower pots for Child Abuse Prevention Month'], conf:'seen'},
+  {id:'u2', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box #8', sticky:'Child Abuse Prevention Month flower pots #8', col:COL.usps, p:[8.25,4.98,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:36', items:['Child Abuse Prevention Month flower pots'], conf:'seen'},
+  {id:'u3', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box', sticky:'Educational handouts', col:COL.usps, p:[8.25,5.56,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:34', items:['Educational handouts'], conf:'seen'},
+  {id:'u4', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box', sticky:'Educational handouts', col:COL.usps, p:[8.25,6.14,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:33', items:['Educational handouts'], conf:'seen'},
+  {id:'u5', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box', sticky:'Educational handouts', col:COL.usps, p:[8.25,6.72,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:32', items:['Educational handouts'], conf:'seen'},
+  {id:'u6', kind:'usps', zone:'Right wall · front corner stack', title:'USPS box (top)', sticky:'Breastfeeding supplies & blood pressure monitor', col:COL.usps, p:[8.25,7.30,0.35], s:[1.65,0.56,2.0], face:'-x', t:'1:31', items:['Breastfeeding supplies','Blood pressure monitor'], conf:'seen'},
+  {id:'babyscales', kind:'retail', count:3, art:'scale', tag:'Digital baby scales (3)', zone:'Right wall · front corner stack', title:'Digital baby scale boxes (3)', sticky:null, col:COL.white, band:'#2e8b57', p:[8.4,0,2.55], s:[1.5,3.3,0.95], face:'-x', t:'1:28', items:['3 boxed digital baby scales, stacked just left of the front corner stack'], conf:'seen'},
+  {id:'walmart', kind:'box', count:2, art:'walmart', zone:'Right wall · front corner stack', title:'Walmart boxes (2)', sticky:'Grooming kits', col:COL.walmart, p:[8.2,0,0.3], s:[1.8,1.8,2.15], face:'-x', t:'1:42', items:['Grooming kits (12 on the sheet)'], conf:'seen'},
+  {id:'sams', kind:'box', art:'sams', zone:'Right wall · front corner stack', title:"Sam's Club box", sticky:'Diapers', col:COL.card, p:[8.2,1.8,0.3], s:[1.8,1.2,2.15], face:'-x', t:'1:40', items:['Diapers'], conf:'seen'},
+  {id:'kits', kind:'cases', zone:'Right wall · front corner stack', title:'Silver hard cases (4)', sticky:'Contraception Ed #4', col:COL.silver, p:[8.3,3.0,0.4], s:[1.6,1.4,1.95], face:'-x', t:'1:39', items:['4 contraceptive teaching kits (up to date)'], conf:'seen'},
+];
+
+// Inventory: [name, count, typedWas, note, where[], conf]
+const INV_RAW = [
+  ['Baby & household', [
+    ['Infant socks','110',null,'',['brown'],'likely'], ['Finger toothbrushes','35',null,'',['brown'],'likely'], ['Sleeper sacks','3',null,'',['brown'],'likely'],
+    ['Grooming kits','12','14','',['walmart','bl1'],'seen'], ['Home safety kits','15',null,'',['brown'],'likely'], ['Cart covers','9',null,'',['brown'],'likely'],
+    ['No-spill snack bowls','2 girl · 8 unisex',null,'',['brown'],'likely'], ['Toddler plates (portion)','7',null,'',['brown'],'likely'], ['Toddler socks','186',null,'',['brown'],'likely'],
+    ['Sippy cups','8','15','',['brown'],'likely'], ['Necklaces','30',null,'',['brown'],'likely'], ['Graduation caps','—',null,'Not on the sheet; labeled tote',['bl6'],'seen'], ['Party supplies','—',null,'Not on the sheet; labeled tote',['ro3'],'seen'], ['Projector','1',null,'Not on the sheet',['laptopbag'],'seen'], ['Photo albums','3',null,'',['brown'],'likely'],
+    ['Hand sanitizers','~30',null,'Added by hand',[],'unknown'], ['Diapers','—',null,'Not on the sheet, but two labeled boxes',['lb2','sams'],'seen'],
+  ]],
+  ['Toys', [
+    ['Wood blocks','11',null,'',['bl3','bl4','ro1','lb1'],'likely'], ['Wooden puzzles','54',null,'',['bl3','bl4','ro1','lb1'],'likely'], ['Shape sorters','1',null,'',['bl3','bl4','ro1'],'likely'],
+    ['Activity house toy','2',null,'',['bl3','bl4','ro1'],'likely'], ['Ring stack','3',null,'',['bl3','bl4','ro1'],'likely'], ['Puzzles','111',null,'',['orange'],'likely'], ['Developmental toys (preschool)','—',null,'Not on the sheet; labeled bag',['bl7'],'seen'],
+  ]],
+  ['Large baby gear', [
+    ['Floor interactive mats','19',null,'',['large'],'likely'], ['Jump ups','4',null,'',['large'],'likely'], ['Bumbo seats','15','16','Bumbo floor seats',['packs'],'seen'],
+    ['Feeding boosters','12',null,'Checked off',['large','brown'],'likely'], ['Pack n plays','7',null,'',['large'],'likely'], ['Exersaucers','7',null,'Checked off',['large'],'likely'],
+    ['Strollers','5',null,'',['large'],'likely'], ['Activity tables','2','6','',['large'],'likely'], ['Potties','19',null,'Back wall boxes, plus some in a tote',['large','ro1'],'likely'],
+    ['Outdoor swings','9 girl · 76','9g · 85','Pink & blue bucket swings',['potties'],'seen'], ['Cosco cribs','7',null,'Added by hand',['large'],'likely'], ['Portable carts','3',null,'Added by hand',[],'unknown'],
+  ]],
+  ['Frames, books & media', [
+    ['Picture frames','~30','21','"Pic frame box"',['frames-photo'],'seen'], ['Certificate frames','50','60','Own box',['frames-cert'],'seen'],
+    ['Dr. Seuss books','51',null,'',['r-books'],'likely'], ['Educational books','34',null,'',['r-books'],'likely'], ['Educational DVDs','67',null,'',[],'unknown'],
+    ['Educational handouts','—',null,'Not on the sheet; 3 labeled boxes',['u3','u4','u5'],'seen'],
+  ]],
+  ['Breastfeeding', [
+    ['Breast pumps','15 + 1 demo',null,'',['pumps'],'likely'], ['Breastfeeding suitcases','3',null,'',[],'unknown'],
+    ['Breastfeeding supplies','—',null,'Not on the sheet; labeled box',['u6'],'seen'],
+  ]],
+  ['Models & teaching kits', [
+    ['Domino Effect of Labor & Delivery','1',null,'Added by hand',['la3'],'likely'], ['Baby bellies','3',null,'Added by hand',['la3'],'likely'],
+    ['BF models','3','4','Models box',['la3'],'likely'], ['Fetal model','1',null,'Models box · checked',['la3'],'likely'], ['Placenta','1',null,'Models box · checked',['la3'],'likely'],
+    ['Fast food model','1',null,'Models box · checked',['la3'],'likely'], ['Tooth decay model','5',null,'Models box',['la3'],'likely'], ['Food calorie model','2','1','Models box',['la3'],'likely'],
+    ['PP box','5',null,'Models box',['la3'],'likely'], ['Prenatal box','5',null,'Models box',['la3'],'likely'], ['BF box','5',null,'Models box',['la3'],'likely'],
+    ['Safe sleep flip books','3',null,'Models box · checked',['la3'],'likely'], ['Contraceptive teaching kits','4',null,'Added by hand · up to date',['kits'],'seen'],
+    ['CPR mannequins','1 adult · 2 infant',null,'Checked off',['ro2'],'seen'], ['Demo tubs','5',null,'',['r-tubs'],'seen'],
+  ]],
+  ['Equipment', [
+    ['Baby scales','8',null,"One doesn't work · 3 boxed + 5 in blue bags",['babyscales','ro-bags'],'seen'], ['Adult scales','4',null,'Checked off · loose on the blue bags',['adultscales','adultscale2'],'seen'], ['DVD players','4',null,'',['dvd'],'likely'],
+    ['Touch-free thermometers','4','3','One is with a scale · checked',['ro2'],'likely'], ['Thermometers','2','3','',['ro2'],'seen'], ['Stethoscopes','6',null,'',['ro2'],'seen'],
+    ['Adult BP cuffs','7',null,'',['bpcuffs','bl2','u6'],'seen'], ['Child BP cuffs','2',null,'',['bpcuffs','bl2'],'seen'], ['Biometric scale','1',null,'Confirmed by hand',[],'unknown'],
+    ['Printers','10',null,'4 visible in the corner stack',['printers'],'seen'], ['Keyboards','10',null,'Checked off',['r-scan'],'seen'], ['Monitors','10',null,'Checked off',['monitors'],'seen'],
+    ['Docking stations','9',null,'Checked off',['cords'],'likely'], ['Scanners','5',null,'',['r-scan'],'seen'], ['Laptops','5',null,'Checked off',[],'unknown'],
+    ['Mice','5',null,'',['cords'],'likely'], ['AC adapters','73',null,'Added by hand',['cords','dvd'],'likely'],
+  ]],
+];
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const SECTIONS = INV_RAW.map(([s])=>s);
+const INV = [];
+INV_RAW.forEach(([sec,rows])=>rows.forEach(([name,count,was,note,where,conf])=>INV.push({key:slug(name),sec,name,count,was,note,where,conf})));
+
+// ---- Overrides (edits saved in the shared store) ----
+const ovC = {};   // container id -> {title, sticky, items, conf, updatedAt}
+const ovI = {};   // inventory key -> {count, note, where, conf, ...} ; custom items have custom:true
+const byId = Object.fromEntries(C.map(c=>[c.id,c]));
+const eff = id => ({...byId[id], ...(ovC[id]||{})});
+function invList(){
+  const base = INV.map(r=>({...r, ...(ovI[r.key]||{})}));
+  Object.entries(ovI).forEach(([k,v])=>{ if(v.custom && !v.deleted) base.push({key:k, was:null, note:'', where:[], conf:'seen', ...v}); });
+  return base.filter(r=>!r.deleted);
+}
+const label = c => (c.sticky && c.conf!=='unreadable') ? c.sticky : (c.tag || c.title);
+
+// ---- Layers: stacking level computed from what each item sits on ----
+const LV = {}, TOP = {};
+(function computeLevels(){
+  const overlap = (a,b)=> a.p[0] < b.p[0]+b.s[0]-0.05 && b.p[0] < a.p[0]+a.s[0]-0.05 && a.p[2] < b.p[2]+b.s[2]-0.05 && b.p[2] < a.p[2]+a.s[2]-0.05;
+  const sorted = [...C].sort((a,b)=>a.p[1]-b.p[1]);
+  for (const c of sorted){
+    if (c.noLayer){ LV[c.id]=0; continue; }
+    if (c.p[1] < 0.05){ LV[c.id]=1; continue; }
+    const under = C.filter(o=>o!==c && Math.abs(o.p[1]+o.s[1]-c.p[1])<0.2 && overlap(o,c));
+    LV[c.id] = under.length ? 1+Math.max(...under.map(o=>LV[o.id]||1)) : 1+Math.round(c.p[1]/1.3);
+  }
+  for (const c of C) TOP[c.id] = !C.some(o=>o!==c && !o.noLayer && Math.abs(c.p[1]+c.s[1]-o.p[1])<0.2 && overlap(o,c));
+})();
+const MAXLV = Math.max(...Object.values(LV));
+let layer = 'all'; // 'all' | number | 'top'
+const layerState = id => (byId[id]&&byId[id].noLayer) ? 'on' : layer==='all' ? 'on' : layer==='top' ? (TOP[id]?'on':'ghost') : (LV[id]===layer?'on':LV[id]<layer?'ghost':'off');
+
+// ================= 3D SCENE =================
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55,1,0.05,200);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI*0.495; controls.minDistance = 2; controls.maxDistance = 45; controls.screenSpacePanning = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x77776f,0.75));
+const bulb = new THREE.PointLight(0xfff3dd,0.55,30); bulb.position.set(5,7.6,6); scene.add(bulb);
+const sun = new THREE.DirectionalLight(0xffffff,0.6); sun.position.set(2,16,-6); sun.target.position.set(5,0,8);
+sun.castShadow = true; sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-10,right:10,top:12,bottom:-12,near:1,far:40}); sun.shadow.bias=-0.0008;
+scene.add(sun); scene.add(sun.target);
+
+const wx = x => W - x; // flip so the left wall shows on the left from the door
+
+// materials
+const STD = (color, o={}) => new THREE.MeshStandardMaterial({color, roughness:o.r??0.8, metalness:o.m??0, transparent:!!o.t, opacity:o.op??1, flatShading:!!o.flat, side:o.side||THREE.FrontSide, map:o.map||null, depthWrite:o.dw??true});
+const floorMat = STD('#b9bab4',{r:0.95}), wallMat = STD('#d7d9d3',{t:true,op:0.4,side:THREE.DoubleSide,dw:false});
+
+// floor (concrete texture)
+(function(){
+  const cv=document.createElement('canvas'); cv.width=cv.height=512; const g=cv.getContext('2d');
+  g.fillStyle='#a9aaa4'; g.fillRect(0,0,512,512);
+  for(let i=0;i<5000;i++){const v=150+Math.random()*60|0; g.fillStyle=`rgba(${v},${v},${v-4},.18)`; g.fillRect(Math.random()*512,Math.random()*512,2+Math.random()*3,2+Math.random()*3);}
+  g.strokeStyle='rgba(60,60,60,.25)'; g.lineWidth=2; g.beginPath(); g.moveTo(0,256); g.lineTo(512,256); g.stroke();
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,3); t.encoding=THREE.sRGBEncoding; floorMat.map=t;
+})();
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W,D), floorMat);
+floor.rotation.x=-Math.PI/2; floor.position.set(W/2,0,D/2); floor.receiveShadow=true; scene.add(floor);
+function wall(w,h,pos,rotY){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wallMat); m.position.copy(pos); m.rotation.y=rotY; scene.add(m);
+  const pts=[]; for(let i=0.33;i<w;i+=0.33){pts.push(i-w/2,-h/2,0,i-w/2,h/2,0)}
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+  const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x8a8d88,transparent:true,opacity:.25})); l.position.copy(pos); l.rotation.y=rotY; scene.add(l);
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0x777777})); e.position.copy(pos); e.rotation.y=rotY; scene.add(e);
+}
+wall(D,H,new THREE.Vector3(W,H/2,D/2),-Math.PI/2); wall(D,H,new THREE.Vector3(0,H/2,D/2),Math.PI/2); wall(W,H,new THREE.Vector3(W/2,H/2,D),0);
+// ceiling joists + door frame
+for(let z=1;z<D;z+=1.5){const j=new THREE.Mesh(new THREE.BoxGeometry(W,0.12,0.12),STD('#6d7277',{m:.5,r:.5}));j.position.set(W/2,H,z);scene.add(j);}
+const door = new THREE.Group();
+[[0.1,7,0.15,0.05,3.5],[0.1,7,0.15,W-0.05,3.5],[W,0.15,0.15,W/2,7.05]].forEach(([w,h,d,x,y])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),STD('#c9ccd0',{m:.6,r:.4}));m.position.set(x,y,0);door.add(m)});
+const rolled = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,W,16),STD('#dfe2e4',{m:.5,r:.5})); rolled.rotation.z=Math.PI/2; rolled.position.set(W/2,7.5,0.1); door.add(rolled);
+scene.add(door);
+
+function themeScene(){
+  scene.background = new THREE.Color(css('--scene')||'#e4e6e1');
+  const dark = (css('--bg')||'').toLowerCase()==='#141714';
+  wallMat.color.set(dark?'#4a5049':'#d7d9d3');
+}
+
+// seeded random per container
+function rng(seed){let h=2166136261; for(const ch of seed) h=Math.imul(h^ch.charCodeAt(0),16777619); return ()=>{h+=0x6D2B79F5; let t=h; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296;};}
+const shade = (hex, k) => { const c=new THREE.Color(hex); const hsl={}; c.getHSL(hsl); c.setHSL(hsl.h,hsl.s,Math.max(0,Math.min(1,hsl.l*k))); return '#'+c.getHexString(); };
+
+// --- sticky note texture (big, high contrast) ---
+const stickyCache = {};
+function stickyTex(text, faint){
+  const k=(faint?'f|':'')+text; if(stickyCache[k]) return stickyCache[k];
+  const S=512, cv=document.createElement('canvas'); cv.width=cv.height=S; const g=cv.getContext('2d');
+  g.fillStyle = faint ? '#ffb7d8' : '#ff4fa3'; g.fillRect(0,0,S,S);
+  const grd=g.createLinearGradient(0,0,0,S); grd.addColorStop(0,'rgba(255,255,255,.18)'); grd.addColorStop(1,'rgba(0,0,0,.10)'); g.fillStyle=grd; g.fillRect(0,0,S,S);
+  g.fillStyle='rgba(255,255,255,.35)'; g.fillRect(S*0.3,0,S*0.4,S*0.07); // tape
+  g.fillStyle = faint ? '#5b2a40' : '#1b0410'; g.textAlign='center'; g.textBaseline='middle';
+  const words=text.split(' '); let size=S*0.22, lines;
+  for(;size>18;size-=2){ g.font=`${faint?400:700} ${size}px Kalam, cursive`; lines=[]; let cur='';
+    for(const w of words){const t=cur?cur+' '+w:w; if(g.measureText(t).width>S*0.86&&cur){lines.push(cur);cur=w}else cur=t} lines.push(cur);
+    if(lines.length*size*1.08 < S*0.84 && lines.every(l=>g.measureText(l).width<S*0.9)) break; }
+  lines.forEach((ln,i)=>g.fillText(ln,S/2,S/2+(i-(lines.length-1)/2)*size*1.08+S*0.02));
+  const t=new THREE.CanvasTexture(cv); t.anisotropy=8; t.encoding=THREE.sRGBEncoding; return stickyCache[k]=t;
+}
+const tagCache={};
+function tagTex(text){ if(tagCache[text]) return tagCache[text]; const S=512, cv=document.createElement('canvas'); cv.width=S; cv.height=S*0.5; const g=cv.getContext('2d');
+  g.fillStyle='#ffffff'; g.fillRect(0,0,S,S*0.5); g.strokeStyle='#1f2320'; g.lineWidth=10; g.strokeRect(5,5,S-10,S*0.5-10);
+  g.fillStyle='#1f2320'; g.textAlign='center'; g.textBaseline='middle'; let size=88; g.font=`800 ${size}px Archivo, sans-serif`;
+  while(g.measureText(text).width>S*0.88 && size>30){ size-=4; g.font=`800 ${size}px Archivo, sans-serif`; }
+  const words=text.split(' '); if(g.measureText(text).width>S*0.88 && words.length>1){ const mid=Math.ceil(words.length/2); g.fillText(words.slice(0,mid).join(' '),S/2,S*0.17); g.fillText(words.slice(mid).join(' '),S/2,S*0.34); }
+  else g.fillText(text,S/2,S*0.26);
+  const t=new THREE.CanvasTexture(cv); t.anisotropy=8; t.encoding=THREE.sRGBEncoding; return tagCache[text]=t; }
+function signTex(){ return canvasTex('backsign',1400,560,(g,W,H)=>{
+  g.fillStyle='#ffffff'; g.fillRect(0,0,W,H); g.strokeStyle='#1f2320'; g.lineWidth=14; g.strokeRect(7,7,W-14,H-14);
+  g.fillStyle='#e8287f'; g.fillRect(14,14,W-28,96); g.fillStyle='#fff'; g.font='800 64px Archivo, sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('BACK WALL · BOXED BABY GEAR',W/2,64);
+  g.fillStyle='#1f2320'; g.font='700 40px IBM Plex Sans, sans-serif';
+  const lines=['Floor seats · Bumbo seats · feeding boosters · potties','Pack n plays · exersaucers · jump ups · strollers','Activity tables · Cosco cribs · outdoor swings · floor mats','Puzzles (orange boxes) · breast pumps (grey boxes, top)','Socks · sippy cups · plates · snack bowls · safety kits'];
+  lines.forEach((l,i)=>g.fillText(l,W/2,160+i*74));
+  g.fillStyle='#5d645d'; g.font='italic 30px IBM Plex Sans, sans-serif'; g.fillText('Best guesses. These boxes were not labeled one by one in the video.',W/2,H-40);
+});}
+function stainTex(){ return canvasTex('stain',512,512,(g,W,H)=>{
+  g.clearRect(0,0,W,H); const r=rng('stain');
+  for(let k=0;k<26;k++){ const x=W*(0.25+r()*0.5), y=H*(0.25+r()*0.5), rad=W*(0.06+r()*0.18);
+    const gr=g.createRadialGradient(x,y,rad*0.2,x,y,rad); gr.addColorStop(0,'rgba(120,78,35,.55)'); gr.addColorStop(0.75,'rgba(140,92,40,.35)'); gr.addColorStop(0.92,'rgba(95,58,22,.7)'); gr.addColorStop(1,'rgba(95,58,22,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,rad,0,7); g.fill(); }
+});}
+function warnTex(){ return canvasTex('warn',600,300,(g,W,H)=>{
+  g.fillStyle='#ffd23a'; g.fillRect(0,0,W,H); g.strokeStyle='#1f2320'; g.lineWidth=12; g.strokeRect(6,6,W-12,H-12);
+  g.fillStyle='#1f2320'; g.beginPath(); g.moveTo(80,60); g.lineTo(140,170); g.lineTo(20,170); g.closePath(); g.fill(); g.fillStyle='#ffd23a'; g.font='900 70px Archivo, sans-serif'; g.textAlign='center'; g.fillText('!',80,160);
+  g.fillStyle='#1f2320'; g.textAlign='left'; g.font='900 56px Archivo, sans-serif'; g.fillText('WATER',170,105); g.fillText('DAMAGE',170,165);
+  g.font='600 30px IBM Plex Sans, sans-serif'; g.fillText('on the ceiling above.',24,225); g.fillText('Check bins below for moisture.',24,265);
+});}
+// USPS side texture
+const uspsTex = (()=>{const cv=document.createElement('canvas');cv.width=512;cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#f4f2ec';g.fillRect(0,0,512,256);g.fillStyle='#c8102e';g.fillRect(0,22,512,12);g.fillRect(0,222,512,12);
+  g.fillStyle='#244a9a';g.font='700 30px Archivo, sans-serif';g.fillText('UNITED STATES',22,78);g.fillText('POSTAL SERVICE',22,110);
+  g.fillStyle='#c8102e';g.fillText('PRIORITY',330,78);g.fillText('MAIL',372,110);g.fillStyle='#244a9a';g.fillRect(305,52,3,62);
+  const t=new THREE.CanvasTexture(cv);t.encoding=THREE.sRGBEncoding;return t;})();
+const pumpTex = (()=>{const cv=document.createElement('canvas');cv.width=256;cv.height=128;const g=cv.getContext('2d');
+  g.fillStyle='#a9adb0';g.fillRect(0,0,256,128);g.strokeStyle='#e8eaec';g.lineWidth=6;[[70,64,34],[150,64,24],[200,50,14]].forEach(([x,y,r])=>{g.beginPath();g.arc(x,y,r,0,7);g.stroke()});
+  const t=new THREE.CanvasTexture(cv);t.encoding=THREE.sRGBEncoding;return t;})();
+
+// --- geometry helpers ---
+function frustum(w,h,d,taper){ // rectangular tapered tub, centered
+  const g=new THREE.CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2*taper, 1, 4, 1); g.rotateY(Math.PI/4); g.scale(w,h,d); return g; }
+function soft(w,h,d,round=0.35){ // rounded "bag" box
+  const g=new THREE.BoxGeometry(1,1,1,6,6,6); const p=g.attributes.position, v=new THREE.Vector3();
+  for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i); const s=v.clone().normalize().multiplyScalar(0.5*1.25); v.lerp(s,round); p.setXYZ(i,v.x*w,v.y*h,v.z*d);} g.computeVertexNormals(); return g; }
+function add(group, geo, mat, x=0,y=0,z=0){ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; group.add(m); return m; }
+
+// Builders: each returns content centered at origin within (w,h,d) world-axis box.
+// ---------- Detail textures ----------
+const texCache = {};
+function canvasTex(key, wpx, hpx, draw){ if(texCache[key]) return texCache[key]; const cv=document.createElement('canvas'); cv.width=wpx; cv.height=hpx; const g=cv.getContext('2d'); draw(g,wpx,hpx);
+  const t=new THREE.CanvasTexture(cv); t.anisotropy=8; t.encoding=THREE.sRGBEncoding; return texCache[key]=t; }
+function noise(g,w,h,n,alpha,light){ for(let i=0;i<n;i++){ g.fillStyle = light? `rgba(255,255,255,${alpha*Math.random()})` : `rgba(0,0,0,${alpha*Math.random()})`; g.fillRect(Math.random()*w,Math.random()*h,1+Math.random()*2,1+Math.random()*6); } }
+function barcode(g,x,y,w,h){ g.fillStyle='#fff'; g.fillRect(x,y,w,h); g.fillStyle='#111'; let cx=x+w*0.08; while(cx<x+w*0.92){ const bw=1+Math.random()*3; g.fillRect(cx,y+h*0.15,bw,h*0.55); cx+=bw+1+Math.random()*3; } g.font=`${h*0.18}px IBM Plex Mono, monospace`; g.fillText('0 12345 67890 5',x+w*0.1,y+h*0.9); }
+function shipLabel(g,x,y,w,h){ g.fillStyle='#fbfbf7'; g.fillRect(x,y,w,h); g.strokeStyle='#bbb'; g.strokeRect(x,y,w,h); g.fillStyle='#333';
+  for(let i=0;i<4;i++) g.fillRect(x+w*0.08,y+h*(0.12+i*0.1),w*(0.4+Math.random()*0.4),h*0.04); barcode(g,x+w*0.08,y+h*0.58,w*0.84,h*0.34); }
+// tote sides: 4 molded panels around (cylinder UVs wrap all four sides)
+function toteTex(col){ return canvasTex('tote'+col,1024,256,(g,W,H)=>{
+  const grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,shade(col,0.82)); grd.addColorStop(0.18,shade(col,1.08)); grd.addColorStop(1,shade(col,0.86)); g.fillStyle=grd; g.fillRect(0,0,W,H);
+  for(let i=0;i<4;i++){ const x0=i*W/4;
+    g.strokeStyle='rgba(255,255,255,.22)'; g.lineWidth=5; g.strokeRect(x0+34,H*0.3,W/4-68,H*0.58);
+    g.strokeStyle='rgba(0,0,0,.25)'; g.lineWidth=3; g.strokeRect(x0+38,H*0.3+4,W/4-76,H*0.58-8);
+    g.fillStyle='rgba(0,0,0,.28)'; g.fillRect(x0,H*0.16,W/4,4); g.fillStyle='rgba(255,255,255,.18)'; g.fillRect(x0,H*0.16+4,W/4,3);
+    g.fillStyle='rgba(0,0,0,.22)'; g.fillRect(x0+3,0,5,H); g.fillRect(x0+W/4-8,0,5,H);
+    if(i%2===0){ g.fillStyle='#f4f4f4'; g.fillRect(x0+W/4-120,H*0.62,70,56); g.fillStyle='#2b5fae'; g.fillRect(x0+W/4-120,H*0.62,70,14); g.fillStyle='#c33'; g.fillRect(x0+W/4-114,H*0.62+20,24,8); g.fillStyle='#777'; for(let k=0;k<3;k++) g.fillRect(x0+W/4-114,H*0.62+34+k*6,56,2); }
+  }
+  noise(g,W,H,900,0.05,true);
+});}
+function cardTex(c, fw, fh, isTop){
+  const art=c.art||'', key=`card|${c.id}|${fw.toFixed(2)}|${fh.toFixed(2)}|${isTop?1:0}`;
+  const ppf=150, wpx=Math.min(512,Math.max(96,Math.round(fw*ppf))), hpx=Math.min(512,Math.max(96,Math.round(fh*ppf)));
+  return canvasTex(key,wpx,hpx,(g,W,H)=>{
+    const base = c.col;
+    g.fillStyle=base; g.fillRect(0,0,W,H);
+    if (c.kind==='box' || c.kind==='openbox') { noise(g,W,H,W*H/60,0.08,false); noise(g,W,H,W*H/120,0.06,true);
+      for(let y=4;y<H;y+=6){ g.fillStyle='rgba(0,0,0,.025)'; g.fillRect(0,y,W,1);} }
+    else noise(g,W,H,W*H/200,0.03,false);
+    // edge shading
+    const e=g.createLinearGradient(0,0,W,0); e.addColorStop(0,'rgba(0,0,0,.18)'); e.addColorStop(0.06,'rgba(0,0,0,0)'); e.addColorStop(0.94,'rgba(0,0,0,0)'); e.addColorStop(1,'rgba(0,0,0,.18)'); g.fillStyle=e; g.fillRect(0,0,W,H);
+    if (isTop){ // flap seam + tape
+      g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(0,H/2-1,W,2);
+      if (c.kind==='box'){ g.fillStyle='rgba(214,190,140,.75)'; g.fillRect(0,H/2-H*0.09,W,H*0.18); g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(0,H/2-H*0.09,W,3); }
+      return; }
+    if (c.kind==='box'){ g.fillStyle='rgba(214,190,140,.8)'; g.fillRect(W*0.41,0,W*0.18,H*0.2); g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(W*0.41,0,3,H*0.2);
+      g.fillStyle='rgba(0,0,0,.4)'; g.font=`700 ${Math.max(10,H*0.07)}px Archivo, sans-serif`; g.fillText('↑↑',W*0.06,H*0.13); }
+    if (art==='walmart'){ g.fillStyle='#1f63c6'; g.fillRect(0,H*0.62,W,H*0.3); g.fillStyle='#ffc220'; for(let k=0;k<6;k++){ g.save(); g.translate(W*0.8,H*0.77); g.rotate(k*Math.PI/3); g.fillRect(-3,-H*0.11,6,H*0.07); g.restore(); }
+      }
+    if (art==='sams'){ g.strokeStyle='#1f63c6'; g.lineWidth=Math.max(6,H*0.05); g.beginPath(); g.moveTo(W*0.08,H*0.35); g.lineTo(W*0.3,H*0.55); g.lineTo(W*0.08,H*0.75); g.stroke();
+      g.fillStyle='#1f63c6'; g.font=`700 ${H*0.09}px Archivo, sans-serif`; g.fillText('members club',W*0.55,H*0.3); }
+    if (art==='toner'){ g.fillStyle='#1f4fa0'; g.fillRect(0,0,W,H*0.22); g.fillStyle='#fff'; g.font=`700 ${H*0.12}px Archivo, sans-serif`; g.fillText('TONER',W*0.06,H*0.16);
+      g.strokeStyle='#666'; g.lineWidth=2; g.strokeRect(W*0.25,H*0.38,W*0.5,H*0.3); g.strokeRect(W*0.3,H*0.32,W*0.4,H*0.08); }
+    if (art==='scale'){ g.fillStyle='#2e8b57'; g.beginPath(); g.arc(W*0.3,H*0.45,Math.min(W,H)*0.18,0,7); g.lineWidth=4; g.strokeStyle='#2e8b57'; g.stroke();
+      g.beginPath(); g.ellipse(W*0.3,H*0.47,Math.min(W,H)*0.08,Math.min(W,H)*0.04,0.4,0,7); g.fill(); g.font=`600 ${Math.min(W,H)*0.1}px IBM Plex Sans, sans-serif`; g.fillText('digital baby scale',W*0.06,H*0.88); }
+    if (art==='adultscale'){ g.fillStyle='#b22222'; g.font=`800 ${H*0.22}px Archivo, sans-serif`; g.fillText('440 LB',W*0.06,H*0.45); g.fillStyle='#333'; g.font=`600 ${H*0.14}px IBM Plex Sans, sans-serif`; g.fillText('EZ Carry digital scale',W*0.06,H*0.75); }
+    if (art==='skyline'){ g.fillStyle='#4b3d8f'; let x=0; while(x<W){ const bw=10+Math.random()*24, bh=H*(0.15+Math.random()*0.35); g.fillRect(x,H-bh,bw,bh); x+=bw+2; } g.fillStyle='#4b3d8f'; g.font=`700 ${H*0.12}px Archivo, sans-serif`; g.fillText('office supply',W*0.06,H*0.22); }
+    if (art==='seat'){ g.fillStyle='#f6f6f2'; g.fillRect(0,0,W,H); const cx=W*0.32, cy=H*0.55, rr=Math.min(W,H)*0.28;
+      g.fillStyle='#5bb5a6'; g.beginPath(); g.ellipse(cx,cy,rr,rr*0.75,0,0,7); g.fill(); g.fillStyle='#f6f6f2'; g.beginPath(); g.ellipse(cx,cy-rr*0.1,rr*0.6,rr*0.42,0,0,7); g.fill();
+      g.fillStyle='#5bb5a6'; g.beginPath(); g.ellipse(cx,cy+rr*0.05,rr*0.45,rr*0.2,0,0,7); g.fill(); g.fillStyle='#f0c9a8'; g.beginPath(); g.arc(cx,cy-rr*0.55,rr*0.28,0,7); g.fill();
+      g.fillStyle='#1f2320'; g.font=`800 ${H*0.16}px Archivo, sans-serif`; g.fillText('floor',W*0.62,H*0.45); g.fillText('seat',W*0.62,H*0.66);
+      g.fillStyle='#5bb5a6'; g.fillRect(0,H*0.88,W,H*0.12); }
+    if (art==='toy'){ g.fillStyle='#ffd23a'; g.beginPath(); for(let k=0;k<10;k++){ const r=k%2?H*0.08:H*0.2, a=k*Math.PI/5-Math.PI/2; g.lineTo(W*0.3+Math.cos(a)*r,H*0.45+Math.sin(a)*r);} g.fill(); g.fillStyle='#fff'; g.font=`800 ${H*0.14}px Archivo, sans-serif`; g.fillText('Ages 6m+',W*0.5,H*0.5); }
+    if (c.kind==='box' && W>140) shipLabel(g,W*0.62,H*0.08,W*0.3,H*0.26);
+    if (c.kind==='retail' && !art) { g.fillStyle=c.band||'#999'; g.fillRect(0,H*0.15,W,H*0.12); }
+  });
+}
+function boxMats(c,w,h,d){ // per-face textured materials [+x,-x,+y,-y,+z,-z]
+  const sx=STD('#ffffff',{map:cardTex(c,d,h,false),r:.85}), sz=STD('#ffffff',{map:cardTex(c,w,h,false),r:.85}), top=STD('#ffffff',{map:cardTex(c,w,d,true),r:.85}), bot=STD(shade(c.col,0.7));
+  return [sx,sx,top,bot,sz,sz];
+}
+const uspsSide = (()=>canvasTex('usps2',512,320,(g,W,H)=>{
+  g.fillStyle='#f6f4ef'; g.fillRect(0,0,W,H); noise(g,W,H,1200,0.03,false);
+  g.fillStyle='#c8102e'; g.fillRect(0,20,W,12); g.fillRect(0,H-32,W,12); g.fillStyle='#244a9a'; g.fillRect(0,36,W,4); g.fillRect(0,H-40,W,4);
+  g.fillStyle='#244a9a'; g.font='800 30px Archivo, sans-serif'; g.fillText('UNITED STATES',22,86); g.fillText('POSTAL SERVICE',22,118);
+  g.fillStyle='#c8102e'; g.fillText('PRIORITY',330,86); g.fillText('MAIL',372,118); g.fillStyle='#244a9a'; g.fillRect(305,58,3,64);
+  g.fillStyle='#244a9a'; g.beginPath(); g.moveTo(22,140); g.lineTo(70,140); g.lineTo(50,160); g.lineTo(22,160); g.fill();
+  g.fillStyle='#c8102e'; g.font='700 18px Archivo, sans-serif'; g.fillText('LARGE MAILING BOX',22,200); g.fillStyle='#244a9a'; g.font='600 14px IBM Plex Sans, sans-serif'; g.fillText('TRACKED • INSURED',22,226);
+  barcode(g,340,170,150,70);
+}))();
+const uspsTop = (()=>canvasTex('uspsTop',256,256,(g,W,H)=>{ g.fillStyle='#f6f4ef'; g.fillRect(0,0,W,H); g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(0,H/2-1,W,2); g.fillStyle='rgba(230,230,225,.7)'; g.fillRect(0,H/2-22,W,44); }))();
+
+const B = {
+  tote(c,g,w,h,d){
+    const body=STD('#ffffff',{map:toteTex(c.col),r:.55}), solid=STD(c.col,{r:.55}), lidM=STD(shade(c.col,1.1),{r:.45}), dark=STD(shade(c.col,0.6),{r:.6});
+    const lidH=Math.min(0.17,h*0.13), bh=h-lidH;
+    add(g, frustum(w*0.97,bh*0.96,d*0.97,0.86), [body,solid,solid], 0,-lidH/2+bh*0.02,0);
+    add(g, frustum(w*0.8,bh*0.05,d*0.8,1), dark, 0,-h/2+bh*0.025,0); // stacking foot
+    add(g, new THREE.BoxGeometry(w*1.0,0.09,d*1.0), solid, 0,h/2-lidH-0.045,0); // rim ledge
+    add(g, new THREE.BoxGeometry(w*1.03,lidH*0.55,d*1.03), lidM, 0,h/2-lidH*0.72,0);
+    add(g, new THREE.BoxGeometry(w*0.84,lidH*0.45,d*0.84), lidM, 0,h/2-lidH*0.22,0);
+    add(g, new THREE.BoxGeometry(w*0.6,lidH*0.2,d*0.6), STD(shade(c.col,1.18),{r:.4}), 0,h/2-0.01,0);
+    const long = d>=w;
+    // molded hand grips on the short ends + lid latch tabs
+    [-1,1].forEach(s=>{
+      if(long){ add(g,new THREE.BoxGeometry(w*0.42,0.13,0.1),dark,0,h/2-lidH-0.2,s*(d*0.485)); add(g,new THREE.BoxGeometry(w*0.3,lidH*0.9,0.06),lidM,0,h/2-lidH*0.7,s*(d*0.52)); }
+      else { add(g,new THREE.BoxGeometry(0.1,0.13,d*0.42),dark,s*(w*0.485),h/2-lidH-0.2,0); add(g,new THREE.BoxGeometry(0.06,lidH*0.9,d*0.3),lidM,s*(w*0.52),h/2-lidH*0.7,0); }
+    });
+  },
+  clear(c,g,w,h,d){
+    const n=c.count||1, each=h/n, r=rng(c.id);
+    for(let i=0;i<n;i++){
+      const y0=-h/2+each*i+each/2, lidH=Math.min(0.14,each*0.12), bh=each-lidH;
+      add(g, frustum(w*0.97,bh,d*0.97,0.9), STD('#dcecf2',{t:true,op:0.32,r:.12,dw:false}), 0,y0-lidH/2,0);
+      add(g, new THREE.BoxGeometry(w*0.99,0.04,d*0.99), STD('#e9f2f5',{t:true,op:.6}), 0,y0+each/2-lidH-0.02,0);
+      add(g, new THREE.BoxGeometry(w*1.02,lidH,d*1.02), STD(c.lid||'#f2f2ee',{r:.4,t:true,op:.85}), 0,y0+each/2-lidH/2,0);
+      const latch=STD(c.lid&&c.lid!=='#f2f2ee'?c.lid:'#3fb7c9',{r:.35});
+      [-1,1].forEach(s=> d>=w ? add(g,new THREE.BoxGeometry(0.06,lidH*1.8,d*0.3),latch,s*w*0.51,y0+each/2-lidH*1.2,0) : add(g,new THREE.BoxGeometry(w*0.3,lidH*1.8,0.06),latch,0,y0+each/2-lidH*1.2,s*d*0.51));
+      if (c.lid==='#c6e04a') add(g,new THREE.TorusGeometry(Math.min(w,d)*0.18,0.035,6,14,Math.PI),latch,0,y0+each/2,0);
+      for(let k=0;k<7;k++){ const cw=w*(0.2+r()*0.3), ch=bh*(0.2+r()*0.45), cd=d*(0.18+r()*0.3);
+        add(g,new THREE.BoxGeometry(cw,ch,cd),STD(['#d9b44a','#6aa0c9','#c96a6a','#8fbf7a','#efefe8','#b48fd0','#f08c3a'][k%7],{r:.7}),(r()-.5)*(w-cw)*0.8,y0-lidH-bh/2+ch/2,(r()-.5)*(d-cd)*0.8); }
+    }
+  },
+  box(c,g,w,h,d){
+    const n=c.count||1, each=h/n;
+    for(let i=0;i<n;i++){ const y0=-h/2+each*i+each/2;
+      const m=add(g,new THREE.BoxGeometry(w*0.98,each*0.97,d*0.98),boxMats({...c,id:c.id+i},w*0.98,each*0.97,d*0.98),(i%2?0.03:-0.02),y0,(i%2?-0.03:0.02));
+      m.rotation.y=(i%2?0.015:-0.01);
+      add(g,new THREE.BoxGeometry(w*0.99,0.015,d*0.99),STD(shade(c.col,0.75)),0,y0-each*0.485,0); // bottom seam
+    }
+  },
+  retail(c,g,w,h,d){
+    const n=c.count||1, each=h/n;
+    for(let i=0;i<n;i++){ const y0=-h/2+each*i+each/2;
+      add(g,new THREE.BoxGeometry(w*0.97,each*0.96,d*0.97),boxMats({...c,id:c.id+i},w*0.97,each*0.96,d*0.97),(i%2?0.02:-0.02),y0,0);
+    }
+  },
+  openbox(c,g,w,h,d){
+    const tex=cardTex({...c,kind:'openbox'},w,h,false), m=STD('#ffffff',{map:tex,r:.9,side:THREE.DoubleSide}), t=0.04;
+    add(g,new THREE.BoxGeometry(w,t,d),m,0,-h/2+t/2,0);
+    [[w,h,t,0,0,d/2],[w,h,t,0,0,-d/2],[t,h,d,w/2,0,0],[t,h,d,-w/2,0,0]].forEach(([a,b,cc,x,y,z])=>add(g,new THREE.BoxGeometry(a,b,cc),m,x,y,z));
+    const f1=add(g,new THREE.BoxGeometry(w,t,d*0.45),m,0,h/2+d*0.18,d/2+0.12); f1.rotation.x=1.0;
+    const f2=add(g,new THREE.BoxGeometry(w,t,d*0.45),m,0,h/2+d*0.18,-d/2-0.12); f2.rotation.x=-1.0;
+    const f3=add(g,new THREE.BoxGeometry(t,w*0.3,d),m,w/2+0.1,h/2+0.08,0); f3.rotation.z=-0.6;
+    for(let k=0;k<7;k++){ const fr=add(g,new THREE.BoxGeometry(w*0.82,h*0.85,0.05),STD(k%2?'#2a2a2a':'#c9a36a',{r:.5}),0,-0.02,-d/2+0.2+k*(d-0.4)/6); fr.rotation.x=(k%3-1)*0.05;
+      add(g,new THREE.BoxGeometry(w*0.62,h*0.62,0.055),STD('#f4f1ea',{r:.4}),0,-0.02,-d/2+0.2+k*(d-0.4)/6); }
+  },
+  usps(c,g,w,h,d){
+    const side=STD('#ffffff',{map:uspsSide,r:.7}), top=STD('#ffffff',{map:uspsTop,r:.7});
+    add(g,new THREE.BoxGeometry(w*0.98,h*0.97,d*0.98),[side,side,top,top,side,side],0,0,0);
+    add(g,new THREE.BoxGeometry(w*0.99,0.02,d*0.2),STD('#e8e8e2',{t:true,op:.7}),0,h*0.49,0);
+  },
+  printers(c,g,w,h,d){
+    const cols=['#e3e3de','#e8e8e3','#3b3e43','#3b3e43'], each=h/4;
+    cols.forEach((col,i)=>{ const y0=-h/2+each*i+each/2, pw=w*0.94-i*0.04, m=STD(col,{r:.45}), dk=STD(shade(col,0.55),{r:.5});
+      add(g,new THREE.BoxGeometry(pw,each*0.96,d*0.92),m,0,y0,0);
+      // front (aisle side is world -x for the left wall)
+      add(g,new THREE.BoxGeometry(0.03,each*0.28,d*0.72),dk,-pw/2,y0-each*0.22,0); // paper tray
+      add(g,new THREE.BoxGeometry(0.035,0.05,d*0.3),STD(shade(col,0.4)),-pw/2-0.01,y0-each*0.18,0); // tray grip
+      add(g,new THREE.BoxGeometry(0.03,each*0.12,d*0.6),STD('#111214'),-pw/2,y0+each*0.15,0); // output slot
+      add(g,new THREE.BoxGeometry(pw*0.55,0.03,d*0.55),dk,0.05,y0+each*0.48,0); // top output bay
+      add(g,new THREE.BoxGeometry(pw*0.25,0.04,d*0.22),STD('#1b1c1f',{r:.3}),-pw*0.3,y0+each*0.49,d*0.3); // control panel
+      add(g,new THREE.SphereGeometry(0.025,8,6),new THREE.MeshBasicMaterial({color:0x37d36b}),-pw*0.38,y0+each*0.52,d*0.36);
+      for(let k=0;k<5;k++) add(g,new THREE.BoxGeometry(pw*0.5,0.015,0.01),dk,0,y0+each*(0.1+k*0.06),d*0.461); // side vents
+    });
+  },
+  hardcase(c,g,w,h,d){
+    const m=STD('#1c1d20',{r:.35,m:.1}), al=STD('#b9bec4',{m:.85,r:.25});
+    add(g,soft(w*0.95,h*0.9,d*0.95,0.12),m,0,-0.02,0);
+    for(let k=-2;k<=2;k++) add(g,new THREE.BoxGeometry(w*0.96,0.025,0.03),STD('#2a2b2f'),0,-0.02+k*h*0.12,d*0.475);
+    add(g,new THREE.BoxGeometry(w*0.97,0.05,d*0.97),al,0,h*0.08,0); // seam band
+    const hd=add(g,new THREE.TorusGeometry(0.22,0.045,8,16,Math.PI),m,0,h*0.43,0); hd.rotation.y=Math.PI/2;
+    [-1,1].forEach(s=>add(g,new THREE.BoxGeometry(0.06,0.12,0.16),al,-w*0.48,h*0.08,s*d*0.28));
+    [-1,1].forEach(s=>[-1,1].forEach(t=>add(g,new THREE.CylinderGeometry(0.05,0.05,0.04,10),STD('#111'),s*w*0.38,-h*0.47,t*d*0.38)));
+  },
+  basket(c,g,w,h,d){ add(g,frustum(w,h,d,0.8),STD(c.col,{r:.5}),0,0,0); add(g,new THREE.BoxGeometry(w*1.02,0.05,d*1.02),STD(shade(c.col,1.2)),0,h/2,0);
+    for(let k=0;k<4;k++) add(g,new THREE.CylinderGeometry(0.02,0.02,0.4,6),STD(['#e33','#36c','#222','#f90'][k]),(k-1.5)*0.1,h/2+0.15,0); },
+  bag(c,g,w,h,d){
+    const m=STD(c.col,{r:.85});
+    add(g,soft(w*0.95,h*0.85,d*0.95,0.4),m,0,-h*0.07,0);
+    const tm=STD(c.trim||shade(c.col,0.7),{r:.8});
+    const hand=new THREE.TorusGeometry(Math.min(w,d)*0.22,0.035,6,16,Math.PI);
+    const long = d>=w;
+    [-1,1].forEach(s=>{const t=add(g,hand,tm,0,h*0.33,0); if(long){t.rotation.y=Math.PI/2; t.position.x=s*w*0.2;} else t.position.z=s*d*0.2;});
+  },
+  roller(c,g,w,h,d){
+    const m=STD(c.col,{r:.7});
+    add(g,soft(w*0.95,h*0.85,d*0.95,0.22),m,0,-0.03,0);
+    const metal=STD('#8c9096',{m:.7,r:.3});
+    [-1,1].forEach(s=>add(g,new THREE.CylinderGeometry(0.03,0.03,0.5,8),metal,0,h/2+0.2,s*d*0.25));
+    add(g,new THREE.BoxGeometry(0.08,0.06,d*0.55),metal,0,h/2+0.45,0);
+  },
+  monitors(c,g,w,h,d){ // screens face the back wall; their thin sides face the aisle
+    const n=10, step=d/n, scr=STD('#121316',{r:.3,m:.2}), bez=STD('#1f2125',{r:.5});
+    for(let i=0;i<n;i++){ const z=-d/2+step*(i+0.5), tilt=-0.08-(i%3)*0.03, ox=(i%2?0.06:-0.06);
+      const mg=new THREE.Group(); mg.position.set(ox,0,z); g.add(mg);
+      const panel=new THREE.Group(); panel.position.set(0,h*0.12,0); panel.rotation.x=tilt; mg.add(panel);
+      add(panel,new THREE.BoxGeometry(w*0.95,h*0.66,0.09),bez,0,0,0);
+      add(panel,new THREE.BoxGeometry(w*0.88,h*0.58,0.01),scr,0,0.01,0.05); // screen toward the back wall
+      add(panel,new THREE.BoxGeometry(w*0.3,h*0.2,0.05),bez,0,-0.02,-0.06); // back housing
+      add(mg,new THREE.CylinderGeometry(0.035,0.045,h*0.28,8),bez,0,-h/2+h*0.17,-0.05);
+      add(mg,new THREE.BoxGeometry(w*0.45,0.05,0.38),bez,0,-h/2+0.03,0);
+    }
+  },
+  hazard(c,g,w,h,d){
+    const stain=new THREE.MeshBasicMaterial({map:stainTex(), transparent:true, depthWrite:false, side:THREE.DoubleSide, toneMapped:false}); stain.userData.op=1; stain.userData.tr=true;
+    const st=new THREE.Mesh(new THREE.PlaneGeometry(w,d),stain); st.rotation.x=Math.PI/2; st.position.set(0,h/2-0.01,0); st.userData.id=c.id; g.add(st);
+    const r=rng(c.id), drip=STD('#7a4a22',{r:.4,t:true,op:.75}); for(let k=0;k<5;k++){ const dlen=0.08+r()*0.25; add(g,new THREE.CylinderGeometry(0.012,0.004,dlen,5),drip,(r()-.5)*w*0.6,h/2-dlen/2,(r()-.5)*d*0.6); }
+    const warn=new THREE.MeshBasicMaterial({map:warnTex(), transparent:true, side:THREE.DoubleSide, toneMapped:false}); warn.userData.op=1; warn.userData.tr=true;
+    const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.75),warn); sg.position.set(-w*0.5-0.05,-0.35,0); sg.rotation.y=-Math.PI/2; sg.userData.id=c.id; g.add(sg); // faces the aisle
+    const wire=STD('#333'); add(g,new THREE.CylinderGeometry(0.008,0.008,0.4,4),wire,-w*0.5-0.05,h/2-0.2,0.5); add(g,new THREE.CylinderGeometry(0.008,0.008,0.4,4),wire,-w*0.5-0.05,h/2-0.2,-0.5);
+  },
+  drawers(c,g,w,h,d){
+    const each=0.55, n=Math.floor(h/each), r=rng(c.id);
+    for(let i=0;i<n;i++){ const y0=-h/2+each*i+each/2;
+      add(g,new THREE.BoxGeometry(w*0.96,each*0.86,d*0.96),STD('#e3eef2',{t:true,op:0.3,r:.15,dw:false}),0,y0-each*0.05,0);
+      add(g,new THREE.BoxGeometry(w*0.98,each*0.1,d*0.98),STD('#f4f4f0',{r:.4}),0,y0+each*0.42,0);
+      add(g,new THREE.BoxGeometry(0.06,each*0.18,0.25),STD('#2fb3b3',{r:.4}),-w*0.49,y0+each*0.3,d*0.25);
+      add(g,new THREE.BoxGeometry(w*0.6,each*0.4,d*0.6),STD(['#d6c2a0','#a9c6de','#e5b2c6','#bfd8a8'][i%4],{r:.8}),(r()-.5)*0.2,y0-each*0.2,(r()-.5)*0.3);
+    }
+  },
+  boxwall(c,g,w,h,d){
+    const r=rng(c.id), palette=c.big?['#b38b5b','#a77f50','#c09a6a','#ece9e2']:['#b38b5b','#c39b69','#ece9e2','#d9d5cc','#a47b4d','#cfa977'];
+    let y=-h/2;
+    while(y < h/2-0.2){
+      const rh = c.big ? 1.2+r()*0.9 : 0.45+r()*0.5, hh=Math.min(rh,h/2-y);
+      let x=-w/2;
+      while(x < w/2-0.1){ const bw=Math.min((c.big?1.1:0.6)+r()*(c.big?0.9:0.6), w/2-x);
+        const col=palette[(r()*palette.length)|0];
+        add(g,new THREE.BoxGeometry(bw*0.97,hh*0.96,d*(0.82+r()*0.16)),STD(col,{r:.9}),x+bw/2+(r()-.5)*0.04,y+hh/2,(r()-.5)*0.1);
+        if(r()>0.6) add(g,new THREE.BoxGeometry(bw*0.35,hh*0.3,0.01),STD('#ffffff',{r:.6}),x+bw/2,y+hh/2,-d*0.45);
+        x+=bw; }
+      y+=hh; }
+  },
+  boxrow(c,g,w,h,d){ const n=4, bw=w/n, side=STD('#ffffff',{map:pumpTex,r:.6}), top=STD('#b0b4b7');
+    for(let i=0;i<n;i++) add(g,new THREE.BoxGeometry(bw*0.96,h*0.95,d*0.9),[side,side,top,top,side,side],-w/2+bw*(i+0.5),0,0); },
+  boxcol(c,g,w,h,d){ const each=0.5, n=Math.floor(h/each), r=rng(c.id);
+    for(let i=0;i<n;i++){ const y0=-h/2+each*i+each/2;
+      add(g,new THREE.BoxGeometry(w*0.95,each*0.95,d*0.92),STD(i%2?'#e07a2e':'#ea8a3a',{r:.6}),(r()-.5)*0.08,y0,(r()-.5)*0.08);
+      add(g,new THREE.BoxGeometry(w*0.4,each*0.4,0.01),STD('#fff3e0'),0,y0,-d*0.47); } },
+  potties(c,g,w,h,d){ const each=0.3, n=Math.floor((h-0.4)/each);
+    for(let i=0;i<n;i++){ const col=i%2?'#5b8fd6':'#e590b3', y0=-h/2+each*i+0.2, m=STD(col,{r:.4});
+      const base=add(g,soft(w*0.85,0.32,d*0.6,0.5),m,0,y0,0); base.rotation.z=0.05*(i%3-1);
+      add(g,new THREE.BoxGeometry(w*0.75,0.4,0.06),m,0,y0+0.2,d*0.28);
+      add(g,new THREE.TorusGeometry(Math.min(w,d)*0.2,0.03,6,14),STD('#d9d0c0'),0,y0+0.17,-d*0.02).rotation.x=Math.PI/2; } },
+  swings(c,g,w,h,d){
+    const each=0.34, n=Math.floor((h-0.7)/each), rope=STD('#3a2f26',{r:.9}), chainM=STD('#9aa0a6',{m:.8,r:.3});
+    for(let i=0;i<n;i++){ const col=i%3===1?'#4f86d4':'#e58fb2', m=STD(col,{r:.35}), y0=-h/2+0.25+each*i, tilt=(i%3-1)*0.06, ox=(i%2?0.04:-0.04);
+      const grp=new THREE.Group(); grp.position.set(ox,y0,0); grp.rotation.z=tilt; g.add(grp);
+      const seat=add(grp,soft(w*0.72,0.32,d*0.62,0.55),m,0,0,0);
+      add(grp,new THREE.BoxGeometry(w*0.66,0.5,0.07),m,0,0.22,d*0.28); // high back
+      add(grp,new THREE.BoxGeometry(0.07,0.32,d*0.5),m,-w*0.34,0.14,0); add(grp,new THREE.BoxGeometry(0.07,0.32,d*0.5),m,w*0.34,0.14,0); // sides
+      add(grp,new THREE.BoxGeometry(w*0.6,0.06,0.08),STD(shade(col,0.75)),0,0.2,-d*0.3); // front T-bar
+      [-1,1].forEach(s=>{ const hole=add(grp,new THREE.CylinderGeometry(0.11,0.11,0.02,14),STD('#1d1d1f'),s*w*0.16,-0.05,-d*0.31); hole.rotation.x=Math.PI/2; });
+      if(i===n-1){ [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>add(grp,new THREE.CylinderGeometry(0.02,0.02,0.9,6),rope,sx*w*0.33,0.6,sz*d*0.26)); }
+    }
+    // coiled ropes / chains hanging over the side
+    for(let k=0;k<3;k++){ const t=add(g,new THREE.TorusGeometry(0.22,0.025,6,20),k===1?chainM:rope,w*0.5,h/2-0.6-k*0.5,-d*0.15+k*0.12); t.rotation.y=Math.PI/2; }
+  },
+  bumbo(c,g,w,h,d){
+    const eh=0.72, n=Math.floor(h/eh), r=rng(c.id);
+    const art={...c, kind:'retail', art:'seat'};
+    for(let i=0;i<n;i++){ const y0=-h/2+eh*i+eh/2, ox=(r()-.5)*0.08, oz=(r()-.5)*0.08;
+      const b=add(g,new THREE.BoxGeometry(w*0.94,eh*0.94,d*0.94),boxMats({...art,id:c.id+'b'+i},w*0.94,eh*0.94,d*0.94),ox,y0,oz); b.rotation.y=(r()-.5)*0.06;
+      const wrap=add(g,soft(w*0.98,eh*0.98,d*0.98,0.06),STD('#ffffff',{t:true,op:.18,r:.05,dw:false}),ox,y0,oz); wrap.castShadow=false;
+    }
+    // one unboxed floor seat on top so you can see what's inside
+    const seatM=STD('#5bb5a6',{r:.6}), y=-h/2+n*eh;
+    add(g,soft(w*0.8,0.3,d*0.8,0.6),seatM,0,y+0.15,0);
+    add(g,new THREE.TorusGeometry(Math.min(w,d)*0.33,0.09,10,24,Math.PI*1.3),seatM,0,y+0.38,0).rotation.x=Math.PI/2;
+    [-1,1].forEach(s=>add(g,new THREE.CylinderGeometry(0.09,0.09,0.02,12),STD('#1d1d1f'),s*0.16,y+0.31,-d*0.15));
+  },
+  duffels(c,g,w,h,d){
+    const n=c.count||5, eh=h/n, r=rng(c.id);
+    for(let i=0;i<n;i++){ const y0=-h/2+eh*i+eh/2, col=i%2?'#2b4fb8':'#2346a6';
+      const b=add(g,soft(w*(0.86+r()*0.1),eh*0.95,d*(0.85+r()*0.1),0.45),STD(col,{r:.75}),(r()-.5)*0.15,y0,(r()-.5)*0.15); b.rotation.y=(r()-.5)*0.3;
+      add(g,new THREE.BoxGeometry(w*0.7,0.02,0.03),STD('#111'),(r()-.5)*0.1,y0+eh*0.46,0).rotation.y=b.rotation.y; // zipper
+      const st=add(g,new THREE.TorusGeometry(0.2,0.03,6,14,Math.PI),STD('#13235a'),0,y0+eh*0.4,0); st.rotation.y=Math.PI/2+b.rotation.y; st.scale.set(1,0.5,1);
+    }
+  },
+  scales(c,g,w,h,d){
+    const n=c.count||1, r=rng(c.id);
+    for(let i=0;i<n;i++){ const sw=Math.min(w,d)*(n>1?0.55:0.85), x=(n>1?(r()-.5)*(w-sw):0), z=(n>1?(i-(n-1)/2)*(d/n):0), y=-h/2+0.05+(n>1?i*0.09:0);
+      const s=new THREE.Group(); s.position.set(x,y,z); s.rotation.y=(r()-.5)*0.9; s.rotation.z=(r()-.5)*0.08; g.add(s);
+      add(s,soft(sw,0.08,sw*1.1,0.3),STD('#25272b',{r:.25,m:.2}),0,0,0);
+      add(s,new THREE.BoxGeometry(sw*0.92,0.012,sw*1.0),STD('#3a3f46',{r:.1,m:.3,t:true,op:.9}),0,0.045,0);
+      add(s,new THREE.BoxGeometry(sw*0.32,0.014,sw*0.14),STD('#9fd3ff',{r:.2}),0,0.05,-sw*0.35);
+    }
+  },
+  tubs(c,g,w,h,d){ const cols=['#e590b3','#e3c95a','#e590b3','#5b8fd6','#e590b3'], each=h/cols.length;
+    cols.forEach((col,i)=>{ const geo=new THREE.CylinderGeometry(0.5,0.42,each*0.9,24,1,true); geo.scale(w,1,d);
+      add(g,geo,STD(col,{r:.4,side:THREE.DoubleSide}),0,-h/2+each*(i+0.5),0);
+      const rim=new THREE.TorusGeometry(0.5,0.03,6,24); rim.rotateX(Math.PI/2); rim.scale(w,1,d); add(g,rim,STD(shade(col,1.1)),0,-h/2+each*(i+1)-0.03,0);
+      if(i===1||i===3) add(g,new THREE.SphereGeometry(0.16,12,10),STD('#8a5a3c',{r:.6}),w*0.15,-h/2+each*(i+0.5)+0.05,d*0.1); }); },
+  packs(c,g,w,h,d){ const each=0.7, n=Math.max(1,Math.round(h/each)), r=rng(c.id), eh=h/n;
+    for(let i=0;i<n;i++){ const y0=-h/2+eh*i+eh/2;
+      const m=add(g,soft(w*0.95,eh*0.95,d*0.95,0.15),STD('#f4f4f1',{r:.25,t:true,op:.95}),(r()-.5)*0.08,y0,(r()-.5)*0.08); m.rotation.y=(r()-.5)*0.1;
+      add(g,new THREE.BoxGeometry(0.01,eh*0.45,d*0.4),STD('#f0c9a8'),-w*0.48,y0,0);
+      add(g,new THREE.BoxGeometry(0.01,eh*0.45,d*0.4),STD('#f0c9a8'),w*0.48,y0,0); } },
+  cases(c,g,w,h,d){ const n=4, each=h/n, al=STD('#b7bcc2',{m:.8,r:.3}), blk=STD('#26282c',{r:.5});
+    for(let i=0;i<n;i++){ const y0=-h/2+each*i+each/2;
+      add(g,new THREE.BoxGeometry(w*0.9,each*0.85,d*0.95),blk,0,y0,0);
+      add(g,new THREE.BoxGeometry(w*0.92,each*0.12,d*0.97),al,0,y0+each*0.38,0); add(g,new THREE.BoxGeometry(w*0.92,each*0.12,d*0.97),al,0,y0-each*0.38,0);
+      const hnd=add(g,new THREE.TorusGeometry(0.16,0.035,6,12,Math.PI),blk,-w*0.47,y0-0.02,0); hnd.rotation.y=Math.PI/2; hnd.rotation.z=Math.PI; hnd.position.x=w*0.47;
+      [-1,1].forEach(s=>add(g,new THREE.BoxGeometry(0.04,0.08,0.12),al,w*0.46,y0,s*d*0.3)); } },
+  chairs(c,g,w,h,d){ const m=STD('#1e1f22',{r:.5,m:.3});
+    for(let k=0;k<2;k++){ const x=-w/2+0.1+k*0.18;
+      add(g,new THREE.BoxGeometry(0.05,h*0.9,d*0.55),m,x,0,-d*0.18).rotation.x=0.08;
+      [-1,1].forEach(s=>add(g,new THREE.CylinderGeometry(0.02,0.02,h*0.95,6),m,x,0,s*d*0.2)); }
+    const e=add(g,new THREE.BoxGeometry(0.04,h*0.95,d*0.5),m,w*0.3,0,d*0.25); e.rotation.x=-0.12; },
+  floormisc(c,g,w,h,d){
+    const red=STD('#c23b3b',{r:.4}), blk=STD('#202124',{r:.5});
+    add(g,new THREE.BoxGeometry(0.7,0.35,0.5),blk,-0.5,-h/2+0.18,0.3); add(g,new THREE.BoxGeometry(0.72,0.08,0.52),red,-0.5,-h/2+0.38,0.3);
+    add(g,new THREE.BoxGeometry(0.6,0.3,0.45),blk,-0.3,-h/2+0.15,-0.4); add(g,new THREE.BoxGeometry(0.62,0.07,0.47),red,-0.3,-h/2+0.33,-0.4);
+    add(g,new THREE.BoxGeometry(0.6,0.05,0.8),blk,0.35,-h/2+0.03,0.1);
+    add(g,new THREE.BoxGeometry(0.55,0.45,0.5),STD('#efefe9'),0.55,-h/2+0.23,0.6); add(g,new THREE.SphereGeometry(0.17,12,10),STD('#4ea64a'),0.55,-h/2+0.5,0.6);
+    add(g,new THREE.CylinderGeometry(0.28,0.2,0.22,24,1,true),STD('#d9eef2',{t:true,op:.4,r:.1,side:THREE.DoubleSide}),0.6,-h/2+0.11,-0.55);
+  },
+};
+
+// Build container groups
+const groups = {}; // id -> {group, sticky, sprite}
+const FACE_N = {'+x':[-1,0,0],'-x':[1,0,0],'-z':[0,0,-1],'+z':[0,0,1]}; // our-x flipped into world
+function build(id){
+  const old = groups[id]; if (old){ scene.remove(old.group); if(old.sprite) scene.remove(old.sprite); }
+  const c = eff(id), [x,y,z]=c.p, [w,h,d]=c.s;
+  const g = new THREE.Group(); g.position.set(wx(x+w/2), y+h/2, z+d/2); g.userData.id=id;
+  (B[c.kind]||B.box)(c,g,w,h,d);
+  g.traverse(o=>{ if(o.isMesh){ o.userData.id=id; const ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(m=>{m.userData.op=m.opacity; m.userData.tr=m.transparent;}); }});
+  let stickyMesh=null, sprite=null;
+  if (c.sticky){
+    const n = FACE_N[c.face]; const faceW = (c.face==='+x'||c.face==='-x') ? d : w;
+    const sz = Math.max(0.55, Math.min(faceW*0.8, h*0.85, 1.5));
+    const mat = new THREE.MeshBasicMaterial({map:stickyTex(c.sticky, c.conf==='unreadable'), toneMapped:false});
+    mat.userData.op=1; mat.userData.tr=false;
+    stickyMesh = new THREE.Mesh(new THREE.PlaneGeometry(sz,sz), mat);
+    const half = (c.face==='+x'||c.face==='-x') ? w/2 : d/2;
+    stickyMesh.position.set(n[0]*(half+0.03), (c.kind==='tote'? -0.05 : 0), n[2]*(half+0.03));
+    stickyMesh.rotation.y = Math.atan2(n[0], n[2]); stickyMesh.rotation.z = (rng(id)()-0.5)*0.08;
+    stickyMesh.userData.id=id; g.add(stickyMesh);
+    const sm = new THREE.SpriteMaterial({map:stickyTex(c.sticky, c.conf==='unreadable'), depthTest:false, toneMapped:false});
+    sprite = new THREE.Sprite(sm); sprite.scale.set(1.1,1.1,1); sprite.position.set(g.position.x + n[0]*0.6, y+h+0.4, g.position.z + n[2]*0.6); sprite.renderOrder=10; sprite.userData.id=id; sprite.visible=false; scene.add(sprite);
+  }
+  if (!c.sticky && c.tag && c.kind!=='hazard'){
+    const n = FACE_N[c.face]; const faceW = (c.face==='+x'||c.face==='-x') ? d : w;
+    const tw = Math.max(0.9, Math.min(faceW*0.95, 1.6)), th = tw*0.5;
+    const tm = new THREE.MeshBasicMaterial({map:tagTex(c.tag), toneMapped:false}); tm.userData.op=1; tm.userData.tr=false;
+    stickyMesh = new THREE.Mesh(new THREE.PlaneGeometry(tw,th), tm);
+    const half = (c.face==='+x'||c.face==='-x') ? w/2 : d/2;
+    stickyMesh.position.set(n[0]*(half+0.06), Math.min(h/2-th/2-0.05, 0.6), n[2]*(half+0.06)); stickyMesh.rotation.y=Math.atan2(n[0],n[2]); stickyMesh.userData.id=id; g.add(stickyMesh);
+    const sm=new THREE.SpriteMaterial({map:tagTex(c.tag), depthTest:false, toneMapped:false}); sprite=new THREE.Sprite(sm); sprite.scale.set(1.4,0.7,1);
+    sprite.position.set(g.position.x+n[0]*0.6, y+h+0.4, g.position.z+n[2]*0.6); sprite.renderOrder=10; sprite.userData.id=id; sprite.visible=false; scene.add(sprite);
+  }
+  if (id==='large'){ // one big sign hanging across the back wall
+    const sw=7.6*2/3, sh=sw*0.4, mat=new THREE.MeshBasicMaterial({map:signTex(), toneMapped:false, side:THREE.DoubleSide}); mat.userData.op=1; mat.userData.tr=false;
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(sw,sh),mat);
+    const wpos=new THREE.Vector3(wx(5.95), 6.6, 11.45); sign.position.copy(wpos).sub(g.position); sign.rotation.y=Math.PI; sign.userData.id=id; g.add(sign);
+    const str=STD('#444',{r:.8}); str.userData.op=1; str.userData.tr=false; [-1,1].forEach(k=>{ const st=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,H-6.6-sh/2,4),str); st.position.set(sign.position.x+k*sw*0.42, sign.position.y+sh/2+(H-6.6-sh/2)/2, sign.position.z); g.add(st); });
+  }
+  scene.add(g); groups[id] = {group:g, sticky:stickyMesh, sprite};
+}
+function buildAll(){ C.forEach(c=>build(c.id)); applyStyles(); }
+
+// highlight / layers
+let selected=null, highlight=null, floatLabels=false;
+function applyStyles(){
+  for (const c of C){
+    const G = groups[c.id]; if(!G) continue;
+    const ls = layerState(c.id), searchOn = !highlight || highlight.has(c.id);
+    const visible = ls!=='off';
+    const strong = ls==='on' && searchOn;
+    G.group.visible = visible;
+    G.group.traverse(o=>{ if(!o.isMesh) return; const ms=Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(m=>{ if(strong){ m.opacity=m.userData.op; m.transparent=m.userData.tr; m.depthWrite=!m.userData.tr; }
+        else { m.transparent=true; m.opacity=0.1; m.depthWrite=false; }
+        if(m.emissive) m.emissive.set(selected===c.id?0x8a1747:0x000000); m.needsUpdate=true; });
+      o.castShadow = strong; });
+    if (G.sticky) G.sticky.material.color.set(selected===c.id ? 0xffe0ef : 0xffffff);
+    if (G.sprite) G.sprite.visible = floatLabels && visible && strong;
+  }
+}
+
+// ================= CAMERA / NAV =================
+const presets = { door:{pos:[5,6.2,-7.5],tgt:[5,2,8]}, top:{pos:[5,26,7.6],tgt:[5,0,7.5]}, left:{pos:[2.8,6.2,4.5],tgt:[9.5,2.6,7]}, right:{pos:[7.2,6.2,4.5],tgt:[0.5,2.6,7]}, back:{pos:[5,4.5,4],tgt:[5,3,15]} };
+let anim=null, nav='orbit';
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function flyTo(pos,tgt){ const from={p:camera.position.clone(),t:controls.target.clone()}, t0=performance.now(), dur=reduceMotion()?0:650;
+  anim=now=>{const k=dur?Math.min(1,(now-t0)/dur):1, e=1-Math.pow(1-k,3); camera.position.lerpVectors(from.p,pos,e); controls.target.lerpVectors(from.t,tgt,e); if(k>=1) anim=null;}; }
+function go(name){ setNav('orbit'); const p=presets[name]; markViews(name); flyTo(new THREE.Vector3(...p.pos), new THREE.Vector3(...p.tgt)); }
+function markViews(name){ document.getElementById('viewsel').value = name||''; }
+document.getElementById('viewsel').addEventListener('change',e=>{ if(e.target.value){ if(mode==='2d') setMode('3d'); go(e.target.value); } });
+camera.position.set(...presets.door.pos); controls.target.set(...presets.door.tgt);
+
+function focusOn(ids){
+  if (mode==='2d') return;
+  const box=new THREE.Box3(); ids.forEach(id=>{ const G=groups[id]; if(G && G.group.visible) box.expandByObject(G.group); }); if(box.isEmpty()) return;
+  const center=box.getCenter(new THREE.Vector3()), c=byId[ids[0]];
+  if (nav==='walk'){ // turn to face it from the aisle
+    const tx = c.face==='+x' ? center.x-4.2 : c.face==='-x' ? center.x+4.2 : center.x;
+    const tz = c.face==='-z' ? Math.max(0.5, center.z-5) : center.z-1.8;
+    walk.target = {x:Math.min(9.4,Math.max(0.6,tx)), z:Math.min(14.4,Math.max(-2,tz)), y:Math.max(3.2,Math.min(6.5,center.y+1)), look:center}; return; }
+  let pos; const bs=box.getSize(new THREE.Vector3()), dd=4.5+Math.max(bs.y,bs.z)*0.55; if(c.face==='+x') pos=new THREE.Vector3(center.x-dd,center.y+1.6,center.z-1.5); else if(c.face==='-x') pos=new THREE.Vector3(center.x+dd,center.y+1.6,center.z-1.5); else { const sz=box.getSize(new THREE.Vector3()), md=Math.max(sz.x,sz.y,sz.z); pos=new THREE.Vector3((center.x+5)/2, Math.min(7,center.y+2.2), Math.max(-5, center.z-(3.5+md*1.1))); }
+  markViews(''); flyTo(pos,center);
+}
+
+// ---- Walk mode: drag to look, pad / WASD to move ----
+const walk = {x:5, y:5.2, z:0.6, yaw:0, pitch:-0.15, keys:{}, target:null};
+function setNav(n){
+  nav=n; document.getElementById('nav-walk').setAttribute('aria-pressed', n==='walk');
+  controls.enabled = n==='orbit'; document.getElementById('pad').hidden = n!=='walk' || mode==='2d';
+  document.getElementById('hint').textContent = n==='walk' ? 'Drag to look around · arrows or WASD to walk · up/dn changes your height' : 'Drag to turn · scroll or pinch to zoom · click any box';
+  if (n==='walk'){ markViews(''); camera.position.set(walk.x,walk.y,walk.z); }
+}
+document.getElementById('nav-walk').onclick=()=>{ if(nav==='walk'){ setNav('orbit'); go('door'); return; } if(mode==='2d') setMode('3d'); walk.x=5; walk.z=0.6; walk.y=5.2; walk.yaw=0; walk.pitch=-0.15; walk.target=null; setNav('walk'); };
+let lookDrag=null;
+renderer.domElement.addEventListener('pointerdown',e=>{ downAt=[e.clientX,e.clientY]; if(nav==='walk'){ lookDrag=[e.clientX,e.clientY]; renderer.domElement.setPointerCapture(e.pointerId);} });
+window.addEventListener('pointermove',e=>{ if(nav!=='walk'||!lookDrag) return; const dx=e.clientX-lookDrag[0], dy=e.clientY-lookDrag[1]; lookDrag=[e.clientX,e.clientY];
+  walk.yaw -= dx*0.005; walk.pitch = Math.max(-1.3,Math.min(1.2, walk.pitch - dy*0.005)); walk.target=null; });
+window.addEventListener('pointerup',()=>{ lookDrag=null; });
+const KEYMAP={KeyW:'f',ArrowUp:'f',KeyS:'b',ArrowDown:'b',KeyA:'l',ArrowLeft:'l',KeyD:'r',ArrowRight:'r',KeyE:'u',KeyQ:'d'};
+window.addEventListener('keydown',e=>{ if(nav!=='walk'||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return; const k=KEYMAP[e.code]; if(k){walk.keys[k]=true; walk.target=null; e.preventDefault();} });
+window.addEventListener('keyup',e=>{ const k=KEYMAP[e.code]; if(k) walk.keys[k]=false; });
+document.querySelectorAll('#pad button').forEach(b=>{ const k=b.dataset.k;
+  const on=e=>{e.preventDefault(); walk.keys[k]=true; walk.target=null; b.classList.add('on'); b.setPointerCapture&&b.setPointerCapture(e.pointerId);};
+  const off=()=>{walk.keys[k]=false; b.classList.remove('on');};
+  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('lostpointercapture',off); });
+function stepWalk(dt){
+  const k=walk.keys, sp=5*dt, f=[Math.sin(walk.yaw),Math.cos(walk.yaw)], r=[-Math.cos(walk.yaw),Math.sin(walk.yaw)];
+  let mx=0,mz=0; if(k.f){mx+=f[0];mz+=f[1]} if(k.b){mx-=f[0];mz-=f[1]} if(k.r){mx+=r[0];mz+=r[1]} if(k.l){mx-=r[0];mz-=r[1]}
+  walk.x=Math.min(9.6,Math.max(0.4,walk.x+mx*sp)); walk.z=Math.min(14.6,Math.max(-6,walk.z+mz*sp));
+  if(k.u) walk.y=Math.min(7.6,walk.y+2.5*dt); if(k.d) walk.y=Math.max(1.5,walk.y-2.5*dt);
+  if (walk.target){ const t=walk.target, a=Math.min(1,dt*4); walk.x+=(t.x-walk.x)*a; walk.z+=(t.z-walk.z)*a; walk.y+=(t.y-walk.y)*a;
+    const dx=t.look.x-walk.x, dz=t.look.z-walk.z, dy=t.look.y-walk.y, yaw=Math.atan2(dx,dz), pitch=Math.atan2(dy,Math.hypot(dx,dz));
+    let dyaw=((yaw-walk.yaw+Math.PI*3)%(Math.PI*2))-Math.PI; walk.yaw+=dyaw*a; walk.pitch+=(pitch-walk.pitch)*a;
+    if (Math.hypot(t.x-walk.x,t.z-walk.z)<0.02 && Math.abs(dyaw)<0.01) walk.target=null; }
+  camera.position.set(walk.x,walk.y,walk.z);
+  camera.lookAt(walk.x+Math.sin(walk.yaw)*Math.cos(walk.pitch), walk.y+Math.sin(walk.pitch), walk.z+Math.cos(walk.yaw)*Math.cos(walk.pitch));
+}
+
+// ---- Picking ----
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(), tip=document.getElementById('tip');
+let downAt=null;
+function pick(ev){
+  const r=renderer.domElement.getBoundingClientRect(); mouse.x=((ev.clientX-r.left)/r.width)*2-1; mouse.y=-((ev.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(mouse,camera);
+  const objs=[]; C.forEach(c=>{ const G=groups[c.id]; if(G && G.group.visible && layerState(c.id)==='on' && (!highlight||highlight.has(c.id))) objs.push(G.group); });
+  const hit=ray.intersectObjects(objs,true)[0]; return hit ? hit.object.userData.id : null;
+}
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!downAt) return; const moved=Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1]); downAt=null; if(moved>5) return;
+  const id=pick(e); if(id) select(id,false); else { selected=null; showDetail(null); applyStyles(); }
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='mouse'||lookDrag) { tip.hidden=true; return; }
+  const id=pick(e), r=view.getBoundingClientRect();
+  if(id){ tip.hidden=false; tip.textContent=label(eff(id)); tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; renderer.domElement.style.cursor='pointer'; }
+  else { tip.hidden=true; renderer.domElement.style.cursor=''; }
+});
+renderer.domElement.addEventListener('pointerleave',()=>tip.hidden=true);
+
+// ================= 2D PLAN + LAYERS =================
+let mode='3d';
+const planEl=document.getElementById('plan');
+function renderPlan(){
+  if (mode!=='2d') return;
+  const S=40, PW=W*S, PH=D*S, M=26;
+  const esc2 = s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  let svg=`<svg viewBox="${-M} ${-M} ${PW+2*M} ${PH+2*M+18}" role="img" aria-label="Floor plan of the unit" preserveAspectRatio="xMidYMid meet">`;
+  svg+=`<rect x="0" y="0" width="${PW}" height="${PH}" fill="var(--surface)" stroke="var(--fg)" stroke-width="3"/>`;
+  for(let i=1;i<W;i++) svg+=`<line x1="${i*S}" y1="0" x2="${i*S}" y2="${PH}" stroke="var(--plan-line)" stroke-width="1"/>`;
+  for(let i=1;i<D;i++) svg+=`<line x1="0" y1="${i*S}" x2="${PW}" y2="${i*S}" stroke="var(--plan-line)" stroke-width="1"/>`;
+  svg+=`<line x1="0" y1="${PH}" x2="${PW}" y2="${PH}" stroke="#e8287f" stroke-width="5" stroke-dasharray="10 6"/>`;
+  svg+=`<text x="${PW/2}" y="${PH+20}" text-anchor="middle" font-size="13" font-family="IBM Plex Mono, monospace" fill="var(--muted)">ROLL-UP DOOR · 10 ft wide (est.)</text>`;
+  svg+=`<text x="${PW/2}" y="-9" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--muted)">BACK WALL</text>`;
+  svg+=`<text transform="translate(-10 ${PH/2}) rotate(-90)" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--muted)">LEFT WALL · 15 ft (est.)</text>`;
+  svg+=`<text transform="translate(${PW+16} ${PH/2}) rotate(90)" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--muted)">RIGHT WALL</text>`;
+  const order=[...C].sort((a,b)=>(LV[a.id]-LV[b.id]));
+  for (const base of order){
+    const c=eff(base.id), ls=layerState(c.id); if(ls==='off') continue;
+    const searchOn=!highlight||highlight.has(c.id), strong=ls==='on'&&searchOn;
+    const x=c.p[0]*S, y=(D-(c.p[2]+c.s[2]))*S, w=c.s[0]*S, h=c.s[2]*S;
+    if(!strong){ svg+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="var(--muted)" stroke-opacity=".45" stroke-dasharray="4 3"/>`; continue; }
+    const sel=selected===c.id;
+    svg+=`<g class="pl" data-id="${c.id}" style="cursor:pointer"><rect x="${x+1}" y="${y+1}" width="${w-2}" height="${h-2}" rx="3" fill="${c.col}" stroke="${sel?'#e8287f':'rgba(0,0,0,.45)'}" stroke-width="${sel?4:1.2}"/>`;
+    const txt = label(c), fs = Math.max(8, Math.min(13, Math.min(w,h)/4.2));
+    if (c.sticky) svg+=`<foreignObject x="${x+3}" y="${y+3}" width="${w-6}" height="${h-6}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><div style="background:${c.conf==='unreadable'?'#ffb7d8':'#ff4fa3'};color:#1b0410;font:700 ${fs}px Kalam,cursive;line-height:1.05;padding:2px 4px;max-height:100%;overflow:hidden;text-align:center;transform:rotate(-2deg)">${esc2(txt)}</div></div></foreignObject>`;
+    else svg+=`<foreignObject x="${x+3}" y="${y+3}" width="${w-6}" height="${h-6}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font:600 ${fs}px 'IBM Plex Sans',sans-serif;line-height:1.1;color:${new THREE.Color(c.col).getHSL({}).l>0.6?'#1f2320':'#fff'};text-shadow:${new THREE.Color(c.col).getHSL({}).l>0.6?'none':'0 1px 2px rgba(0,0,0,.7)'};overflow:hidden">${esc2(c.title)}</div></foreignObject>`;
+    svg+=`<text x="${x+w-4}" y="${y+12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="2.5" paint-order="stroke">L${LV[c.id]}</text></g>`;
+  }
+  svg+='</svg>';
+  planEl.innerHTML=svg;
+  planEl.querySelectorAll('.pl').forEach(el=>el.addEventListener('click',()=>select(el.dataset.id,false)));
+}
+function setMode(m){
+  mode=m; document.getElementById('m-3d').setAttribute('aria-pressed',m==='3d'); document.getElementById('m-2d').setAttribute('aria-pressed',m==='2d');
+  planEl.hidden = m!=='2d'; document.getElementById('hint').hidden = m==='2d';
+  document.getElementById('pad').hidden = m==='2d' || nav!=='walk';
+  if(m==='2d' && layer==='all') setLayer(1); else renderPlan();
+}
+document.getElementById('m-3d').onclick=()=>setMode('3d'); document.getElementById('m-2d').onclick=()=>setMode('2d');
+const layersEl=document.getElementById('layersel');
+function layerButtons(){
+  const opts=[['all','Everything'],...Array.from({length:MAXLV},(_,i)=>[i+1, i===0?'Floor level only':`Layer ${i+1} only`]),['top','Top of each stack']];
+  layersEl.innerHTML = opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join(''); layersEl.value=String(layer);
+  layersEl.onchange=()=>setLayer(layersEl.value==='all'||layersEl.value==='top'?layersEl.value:Number(layersEl.value));
+}
+function setLayer(v){ layer=v; layersEl.value=String(v); applyStyles(); renderPlan(); }
+document.getElementById('t-float').onclick=e=>{ floatLabels=!floatLabels; e.currentTarget.setAttribute('aria-pressed',floatLabels); applyStyles(); };
+
+// ================= PANEL (finding things) =================
+const listEl=document.getElementById('list'), detailEl=document.getElementById('detail'), q=document.getElementById('q'), qclear=document.getElementById('qclear');
+let editing=null, openSecs=new Set(); // editing: {type:'c'|'i'|'new', id}
+const esc = s => String(s??'').replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const confPill = c => c==='seen'?'<span class="pill seen">confirmed</span>':c==='likely'?'<span class="pill likely">best guess</span>':c==='unreadable'?'<span class="pill unknown">label unclear</span>':'<span class="pill unknown">not found yet</span>';
+const invFor = id => invList().filter(r=>r.where.includes(id));
+const boxOptions = sel => ['<option value="">Not found yet</option>', ...[...new Set(C.map(c=>c.zone))].map(z=>`<optgroup label="${esc(z)}">${C.filter(c=>c.zone===z).map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(label(eff(c.id)))}</option>`).join('')}</optgroup>`)].join('');
+const fpOverlap = (a,b)=> a.p[0] < b.p[0]+b.s[0]-0.05 && b.p[0] < a.p[0]+a.s[0]-0.05 && a.p[2] < b.p[2]+b.s[2]-0.05 && b.p[2] < a.p[2]+a.s[2]-0.05;
+const ord = n => n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
+
+// Plain-language directions to a container
+function directions(id){
+  const c=eff(id), x=c.p[0]+c.s[0]/2, ft=Math.max(1,Math.round(c.p[2]+c.s[2]/2));
+  const side = c.zone.startsWith('Back wall') ? 'Go to the back wall' : x<3.5 ? 'Walk in and look along the left wall' : x>6.5 ? 'Walk in and look along the right wall' : 'Look in the middle of the unit';
+  const where = c.zone.startsWith('Back wall') ? `${x<5?'left':'right'} side, about ${ft} ft from the door` : `about ${ft} ft in from the door`;
+  const stack = C.filter(o=>fpOverlap(o,c)).sort((a,b)=>a.p[1]-b.p[1]); const idx=stack.findIndex(o=>o.id===id);
+  const mid=c.p[1]+c.s[1]/2;
+  const height = mid<1.2 ? 'on the floor' : mid<3.2 ? 'about waist height' : mid<5 ? 'about chest height' : 'up high, so you may need a step stool';
+  const pos = stack.length>1 ? `It's ${ord(idx+1)} from the bottom in a stack of ${stack.length}, ${height}.` : (c.p[1]<0.05 ? `It sits ${height}.` : `It sits on top of other boxes, ${height}.`);
+  if (c.kind==='hazard') return { head: c.zone, text: `Walk to the back-left corner, about ${ft} ft in from the door, and look up. The stain is on the ceiling right above the clear stacking bins.` };
+  return { head: c.zone, text: `${side}, ${where}. ${pos}` };
+}
+function miniMap(ids){
+  const S=10, set=new Set(ids);
+  let svg=`<svg class="mini" viewBox="-4 -12 ${W*S+8} ${D*S+28}" role="img" aria-label="Map showing where it is">`;
+  svg+=`<rect x="0" y="0" width="${W*S}" height="${D*S}" fill="var(--surface)" stroke="var(--fg)" stroke-width="2"/>`;
+  C.forEach(c=>{ const x=c.p[0]*S, y=(D-c.p[2]-c.s[2])*S, w=c.s[0]*S, h=c.s[2]*S; if(!set.has(c.id)) svg+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="var(--line)"/>`; });
+  C.forEach(c=>{ if(!set.has(c.id)) return; const x=c.p[0]*S, y=(D-c.p[2]-c.s[2])*S, w=c.s[0]*S, h=c.s[2]*S;
+    svg+=`<rect x="${x-2}" y="${y-2}" width="${w+4}" height="${h+4}" fill="#e8287f" stroke="#fff" stroke-width="1.5"><animate attributeName="opacity" values="1;.45;1" dur="1.6s" repeatCount="indefinite"/></rect>`; });
+  svg+=`<line x1="0" y1="${D*S}" x2="${W*S}" y2="${D*S}" stroke="#e8287f" stroke-width="4" stroke-dasharray="6 4"/><text x="${W*S/2}" y="${D*S+13}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--muted)">DOOR</text><text x="${W*S/2}" y="-3" text-anchor="middle" font-size="8" fill="var(--muted)">BACK</text></svg>`;
+  return svg;
+}
+function whereBlock(ids, fallback){
+  if(!ids.length) return `<div class="where"><div><p class="big">Not spotted in the video</p><p>${esc(fallback||'Check the back wall boxes. Most boxed items from the list are there.')}</p></div>${miniMap(['brown','large'])}</div>`;
+  const d=directions(ids[0]), c=eff(ids[0]);
+  const also = ids.slice(1).map(id=>label(eff(id)));
+  return `<div class="where"><div><p class="big">${esc(d.head)}</p><p>${esc(d.text)}</p>
+    ${c.sticky?`<p>Look for the pink note: <span class="note ${c.conf==='unreadable'?'faint':''}" style="font-size:15px;padding:4px 8px">${esc(c.sticky)}</span></p>`:c.tag?`<p>Look for: <b>${esc(c.tag)}</b></p>`:`<p>Look for: <b>${esc(c.title)}</b></p>`}
+    ${also.length?`<p class="subtle">Also check: ${also.map(esc).join(' · ')}</p>`:''}</div>${miniMap(ids)}</div>`;
+}
+const walkBtn = '<button class="btn" id="walkthere">Walk me there</button>';
+function wireWalk(ids){ const b=document.getElementById('walkthere'); if(b) b.onclick=()=>{ if(mode==='2d') setMode('3d'); if(nav!=='walk'){ walk.x=5; walk.z=0.6; walk.y=5.2; walk.yaw=0; walk.pitch=-0.1; setNav('walk'); } focusOn(ids); }; }
+function closeDetail(){ selected=null; editing=null; detailEl.hidden=true; listEl.hidden=false; highlight=q.value.trim()?highlight:null; applyStyles(); renderPlan(); }
+function openCard(){ detailEl.hidden=false; listEl.hidden=true; detailEl.scrollTop=0; if (matchMedia('(max-width:900px)').matches) document.getElementById('stage').scrollIntoView({behavior: reduceMotion()?'auto':'smooth', block:'start'}); }
+
+function showDetail(id){
+  if (!id){ closeDetail(); return; }
+  const c=eff(id), inv=invFor(id), edited=!!ovC[id];
+  openCard();
+  if (editing && editing.type==='c' && editing.id===id){
+    detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Fix info: ${esc(c.title)}</h2>
+      <form class="edit" id="ef">
+        <label for="f-sticky">What the pink note says<input id="f-sticky" type="text" value="${esc(c.sticky||'')}" placeholder="Leave empty if there is no note"></label>
+        <label for="f-title">Name<input id="f-title" type="text" value="${esc(c.title)}"></label>
+        <label for="f-items">What's inside (one per line)<textarea id="f-items">${esc(c.items.join('\n'))}</textarea></label>
+        <label class="check" for="f-checked"><input id="f-checked" type="checkbox" ${c.conf!=='unreadable'?'checked':''}> I've checked this in person</label>
+        <div class="actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="fcancel">Cancel</button>${edited?'<button class="btn" type="button" id="freset">Undo my changes</button>':''}</div>
+      </form>`;
+    document.getElementById('ef').onsubmit = async e=>{ e.preventDefault();
+      const data={ sticky:document.getElementById('f-sticky').value.trim()||null, title:document.getElementById('f-title').value.trim()||byId[id].title,
+        items:document.getElementById('f-items').value.split('\n').map(s=>s.trim()).filter(Boolean), conf:document.getElementById('f-checked').checked?'seen':'unreadable', updatedAt:Date.now() };
+      editing=null; await saveC(id,data); };
+    document.getElementById('fcancel').onclick=()=>{ editing=null; showDetail(id); };
+    const rs=document.getElementById('freset'); if(rs) rs.onclick=async()=>{ editing=null; await saveC(id,null); };
+    document.getElementById('dback').onclick=()=>{ editing=null; showDetail(id); };
+    return;
+  }
+  detailEl.innerHTML = `<button class="back" id="dback">← Back to ${q.value.trim()?'results':'the list'}</button>
+    <h2>${esc(label(c))}</h2>
+    ${whereBlock([id])}
+    <div class="hdr" style="padding-inline:0">Inside</div>
+    <ul>${c.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
+    ${inv.length?`<div class="hdr" style="padding-inline:0">From the inventory sheet</div><ul>${inv.map(r=>`<li><b>${esc(r.name)}</b>: ${esc(r.count)}</li>`).join('')}</ul>`:''}
+    <div class="actions">${walkBtn}${canWrite!==false?'<button class="linkbtn" id="fedit">Something wrong? Fix it</button>':''}</div>
+    <p class="subtle">Seen at ${c.t} in your video ${confPill(c.conf)} ${edited?'<span class="pill edited">edited</span>':''}</p>`;
+  document.getElementById('dback').onclick=closeDetail;
+  const fe=document.getElementById('fedit'); if(fe) fe.onclick=()=>{ editing={type:'c',id}; showDetail(id); };
+  wireWalk([id]);
+}
+
+function showInvDetail(key){
+  const r = invList().find(x=>x.key===key); if(!r){ closeDetail(); return; }
+  openCard();
+  if (editing && editing.type==='i' && editing.id===key){
+    detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Fix info: ${esc(r.name)}</h2>
+      <form class="edit" id="ef">
+        ${r.custom?`<label for="f-name">Item name<input id="f-name" type="text" value="${esc(r.name)}"></label>`:''}
+        <label for="f-count">How many<input id="f-count" type="text" value="${esc(r.count)}"></label>
+        <label for="f-where">Where is it?<select id="f-where">${boxOptions(r.where[0]||'')}</select></label>
+        <label for="f-conf">How sure<select id="f-conf"><option value="seen" ${r.conf==='seen'?'selected':''}>Confirmed</option><option value="likely" ${r.conf==='likely'?'selected':''}>Best guess</option><option value="unknown" ${r.conf==='unknown'?'selected':''}>Not found yet</option></select></label>
+        <label for="f-note">Note<input id="f-note" type="text" value="${esc(r.note)}"></label>
+        <div class="actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="fcancel">Cancel</button>${r.custom?'<button class="btn" type="button" id="fdel">Delete item</button>':(ovI[key]?'<button class="btn" type="button" id="freset">Undo my changes</button>':'')}</div>
+      </form>`;
+    document.getElementById('ef').onsubmit=async e=>{ e.preventDefault();
+      const w=document.getElementById('f-where').value, old=r.where;
+      const data={ ...(r.custom?{custom:true, sec:r.sec, name:document.getElementById('f-name').value.trim()||r.name}:{}), count:document.getElementById('f-count').value.trim(), where: w? (old[0]===w? old : [w]) : [], conf:document.getElementById('f-conf').value, note:document.getElementById('f-note').value.trim(), updatedAt:Date.now() };
+      editing=null; await saveI(key,data); };
+    document.getElementById('fcancel').onclick=document.getElementById('dback').onclick=()=>{ editing=null; showInvDetail(key); };
+    const rs=document.getElementById('freset'); if(rs) rs.onclick=async()=>{ editing=null; await saveI(key,null); };
+    const dl=document.getElementById('fdel'); if(dl) dl.onclick=async()=>{ editing=null; closeDetail(); await saveI(key,null); };
+    return;
+  }
+  detailEl.innerHTML = `<button class="back" id="dback">← Back to ${q.value.trim()?'results':'the list'}</button>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:6px"><h2 style="margin:0">${esc(r.name)}</h2><span class="count">${esc(r.count)}</span></div>
+    ${r.was?`<p class="subtle" style="margin:2px 0 0">Count corrected by hand (typed sheet said ${esc(r.was)})</p>`:''}
+    ${whereBlock(r.where)}
+    ${r.note?`<p class="subtle">Note: ${esc(r.note)}</p>`:''}
+    <div class="actions">${r.where.length?walkBtn:''}${canWrite!==false?'<button class="linkbtn" id="fedit">Something wrong? Fix it</button>':''}</div>
+    <p class="subtle">${confPill(r.conf)} ${ovI[key]&&!r.custom?'<span class="pill edited">edited</span>':''}</p>`;
+  document.getElementById('dback').onclick=closeDetail;
+  const fe=document.getElementById('fedit'); if(fe) fe.onclick=()=>{ editing={type:'i',id:key}; showInvDetail(key); };
+  wireWalk(r.where);
+}
+
+function showNewItem(){
+  editing={type:'new'}; openCard();
+  detailEl.innerHTML = `<button class="back" id="dback">← Back</button><h2>Add something to the list</h2>
+    <form class="edit" id="ef">
+      <label for="n-name">What is it?<input id="n-name" type="text" required></label>
+      <label for="n-count">How many<input id="n-count" type="text"></label>
+      <label for="n-where">Where is it?<select id="n-where">${boxOptions(selected||'')}</select></label>
+      <label for="n-sec">Group<select id="n-sec">${SECTIONS.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label>
+      <label for="n-note">Note<input id="n-note" type="text"></label>
+      <div class="actions"><button class="btn primary" type="submit">Add</button><button class="btn" type="button" id="fcancel">Cancel</button></div>
+    </form>`;
+  document.getElementById('ef').onsubmit=async e=>{ e.preventDefault(); const name=document.getElementById('n-name').value.trim(); if(!name) return;
+    const key='c-'+slug(name)+'-'+Date.now().toString(36), w=document.getElementById('n-where').value;
+    editing=null; closeDetail();
+    await saveI(key,{custom:true,name,count:document.getElementById('n-count').value.trim()||'—',sec:document.getElementById('n-sec').value,where:w?[w]:[],conf:w?'seen':'unknown',note:document.getElementById('n-note').value.trim(),updatedAt:Date.now()}); };
+  document.getElementById('fcancel').onclick=document.getElementById('dback').onclick=()=>{ editing=null; closeDetail(); };
+}
+
+function select(id, fly=true){ selected=id; editing=null; highlight=new Set([id]); showDetail(id); applyStyles(); renderPlan(); if(fly) focusOn([id]); }
+function pickItem(key){ const r=invList().find(x=>x.key===key); if(!r) return; editing=null; selected=r.where[0]||null;
+  highlight = new Set(r.where.length? r.where : ['brown','large']); showInvDetail(key); applyStyles(); renderPlan(); focusOn(r.where.length? r.where : ['brown','large']); }
+
+// search: forgiving matching (plurals + common other words)
+const SYN = { // other words people might type → phrases to look for (| separated)
+  leak:'water damage', mold:'water damage', wet:'water damage', ceiling:'water damage', damage:'water damage',
+  toilet:'potty|potti', potty:'potty|potti', playpen:'pack n play', crib:'crib', bp:'blood pressure|bp', cuff:'bp cuff|cuff',
+  pump:'breast pump|pump', seat:'seat|bumbo|booster', swing:'swing', computer:'laptop|monitor|keyboard|docking', tv:'monitor', screen:'monitor',
+  graduation:'grad cap', cap:'grad cap', thermometer:'thermomet', stroller:'stroller' };
+const stem = w => w.length>3 ? w.replace(/(es|s)$/,'') : w;
+function matcher(qs){
+  const words=qs.toLowerCase().replace(/pack (and|&) play/g,'pack n play').split(/\s+/).filter(Boolean);
+  const alts=words.map(w=>[stem(w), ...((SYN[w]||SYN[stem(w)]||'').split('|').filter(Boolean))]);
+  return hay => { const h=hay.toLowerCase(); return alts.every(list=>list.some(a=>h.includes(a))); };
+}
+const QUICK = ['Diapers','Baby scales','Grooming kits','Toys','Frames','Handouts','Swings','Models','Books'];
+function rowItem(r){ const where = r.where.length ? eff(r.where[0]).zone : 'Not spotted yet';
+  return `<button class="row" data-key="${esc(r.key)}"><span class="n">${esc(r.name)}</span><span class="c">${esc(r.count)}</span><span class="s"><span>${esc(where)}</span>${r.conf!=='seen'?confPill(r.conf):''}</span></button>`; }
+function rowBox(c){ return `<button class="row" data-ids="${c.id}"><span class="n"><span class="swatch" style="background:${c.col}"></span>${esc(label(c))}</span><span class="c"></span><span class="s"><span>${esc(c.zone)}</span></span></button>`; }
+
+function render(){
+  const needle=q.value.trim(); qclear.hidden=!needle;
+  document.getElementById('chips').innerHTML = needle ? '' : QUICK.map(t=>`<button class="chip" data-q="${t}">${t}</button>`).join('');
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ q.value=b.dataset.q; render(); const first=listEl.querySelector('.row'); if(first) first.click(); });
+  let html=''; const all=invList();
+  if (needle){
+    const m=matcher(needle);
+    const items=all.filter(r=>m(r.name+' '+r.note+' '+r.sec));
+    const boxes=C.map(c=>eff(c.id)).filter(c=>m([c.title,c.sticky||'',c.tag||'',c.items.join(' ')].join(' ')));
+    const hits=new Set(); items.forEach(r=>r.where.forEach(id=>hits.add(id))); boxes.forEach(c=>hits.add(c.id));
+    highlight = hits.size? hits : new Set();
+    if (items.length) html+=`<div class="hdr">On the inventory list</div>`+items.map(rowItem).join('');
+    if (boxes.length) html+=`<div class="hdr">Boxes &amp; bins</div>`+boxes.map(rowBox).join('');
+    if (!items.length && !boxes.length) html=`<div class="empty"><b>Nothing matches “${esc(needle)}”.</b><br>Try a shorter word, or check the back wall boxes, where most boxed items from the list are kept.${canWrite!==false?'<div class="actions"><button class="btn" id="addItem">Add it to the list</button></div>':''}</div>`;
+  } else {
+    if (!selected) highlight=null;
+    html+=`<div class="hdr">Or browse everything</div>`;
+    const secs=[...SECTIONS, ...new Set(all.map(r=>r.sec).filter(s=>!SECTIONS.includes(s)))];
+    secs.forEach(sec=>{ const rs=all.filter(r=>r.sec===sec); if(!rs.length) return;
+      html+=`<details class="sec" data-sec="${esc(sec)}" ${openSecs.has(sec)?'open':''}><summary>${esc(sec)} <span class="subtle">${rs.length}</span></summary>${rs.map(rowItem).join('')}</details>`; });
+    const zones=[...new Set(C.map(c=>c.zone))];
+    html+=`<details class="sec" data-sec="__boxes" ${openSecs.has('__boxes')?'open':''}><summary>Every box, by location <span class="subtle">${C.length}</span></summary>${zones.map(z=>`<div class="hdr">${esc(z)}</div>`+C.filter(c=>c.zone===z).map(c=>rowBox(eff(c.id))).join('')).join('')}</details>`;
+    if (canWrite!==false) html+=`<div class="addrow"><button class="linkbtn" id="addItem">+ Add something that's not on the list</button></div>`;
+  }
+  listEl.innerHTML=html;
+  listEl.querySelectorAll('details.sec').forEach(d=>d.addEventListener('toggle',()=>{ d.open?openSecs.add(d.dataset.sec):openSecs.delete(d.dataset.sec); }));
+  const ab=document.getElementById('addItem'); if(ab) ab.onclick=showNewItem;
+  listEl.querySelectorAll('.row[data-key]').forEach(b=>b.onclick=()=>pickItem(b.dataset.key));
+  listEl.querySelectorAll('.row[data-ids]').forEach(b=>b.onclick=()=>select(b.dataset.ids));
+  applyStyles(); renderPlan();
+}
+q.addEventListener('input',()=>{ if(!detailEl.hidden && !editing){ detailEl.hidden=true; listEl.hidden=false; selected=null; } render(); });
+q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const first=listEl.querySelector('.row'); if(first) first.click(); } if(e.key==='Escape'){ q.value=''; closeDetail(); render(); } });
+qclear.onclick=()=>{ q.value=''; closeDetail(); render(); q.focus(); };
+
+// ================= SAVING (shared store, with device-only fallback) =================
+let db=null, canWrite=null; const saveEl=document.getElementById('savestate');
+const LS='nfp-unit-edits-v1';
+function lsLoad(){ try{ const v=JSON.parse(localStorage.getItem(LS)||'{}'); Object.assign(ovC,v.c||{}); Object.assign(ovI,v.i||{}); }catch(e){} }
+function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({c:ovC,i:ovI})); }catch(e){} }
+function refreshAfterChange(changedIds){
+  changedIds.forEach(id=>{ if(byId[id]) build(id); }); applyStyles(); render();
+  
+}
+async function saveC(id,data){
+  if (data) ovC[id]=data; else delete ovC[id];
+  refreshAfterChange([id]); showDetail(id);
+  if (db){ try{ saveEl.textContent='Saving…'; data ? await db.doc('containers/'+id).set(data) : await db.doc('containers/'+id).delete(); saveEl.textContent='All edits saved'; }
+    catch(e){ readOnlyFail(e); } } else { lsSave(); saveEl.textContent='Saved on this device only'; }
+}
+async function saveI(key,data){
+  if (data) ovI[key]=data; else delete ovI[key];
+  refreshAfterChange([]); if(data) showInvDetail(key);
+  if (db){ try{ saveEl.textContent='Saving…'; data ? await db.doc('inventory/'+key).set(data) : await db.doc('inventory/'+key).delete(); saveEl.textContent='All edits saved'; }
+    catch(e){ readOnlyFail(e); } } else { lsSave(); saveEl.textContent='Saved on this device only'; }
+}
+function readOnlyFail(e){
+  if (e && e.code==='invalid_argument'){ canWrite=false; saveEl.textContent='You can view this page but not edit it'; render(); }
+  else if (e && e.code==='quota_exceeded') saveEl.textContent='Storage is full, so that edit was not saved';
+  else saveEl.textContent='Could not save that edit. Check your connection and try again.';
+}
+async function connect(){
+  if (!window.claude || !window.claude.use){ lsLoad(); saveEl.textContent='Edits save on this device only'; refreshAfterChange(C.map(c=>c.id)); return; }
+  try{ db = await window.claude.use('db'); }catch(e){ db=null; }
+  try{ const user = await window.claude.use('user'); if(user){ const c=await user.can('data.write'); if(c===false) canWrite=false; } }catch(e){}
+  if (!db){ lsLoad(); saveEl.textContent='Edits save on this device only'; refreshAfterChange(C.map(c=>c.id)); return; }
+  saveEl.textContent = canWrite===false ? 'View only' : 'Loading saved edits…';
+  const timer=setTimeout(()=>{ saveEl.textContent='Saved edits can’t be reached yet'; },10000);
+  db.collection('containers').onSnapshot(snap=>{
+    if(!snap.metadata.fromCache) clearTimeout(timer);
+    const changed=[]; snap.docChanges().forEach(ch=>{ const id=ch.doc.id; if(ch.type==='removed') delete ovC[id]; else ovC[id]=ch.doc.data(); changed.push(id); });
+    if(changed.length) refreshAfterChange(changed);
+    if(!snap.metadata.fromCache && canWrite!==false) saveEl.textContent='All edits saved';
+  }, e=>{ clearTimeout(timer); saveEl.textContent='Saved edits are unavailable right now'; });
+  db.collection('inventory').onSnapshot(snap=>{
+    let n=0; snap.docChanges().forEach(ch=>{ const k=ch.doc.id; if(ch.type==='removed') delete ovI[k]; else ovI[k]=ch.doc.data(); n++; });
+    if(n) refreshAfterChange([]);
+  }, ()=>{});
+  render();
+}
+
+// ================= LOOP =================
+function resize(){ const r=view.getBoundingClientRect(); renderer.setSize(r.width,r.height,false); renderer.domElement.style.width='100%'; renderer.domElement.style.height='100%'; camera.aspect=r.width/Math.max(1,r.height); camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(view);
+let last=performance.now();
+function loop(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(nav==='walk') stepWalk(dt); else { if(anim) anim(now); controls.update(); }
+  if(mode==='3d') renderer.render(scene,camera); requestAnimationFrame(loop); }
+
+themeScene();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeScene);
+new MutationObserver(themeScene).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+layerButtons(); buildAll(); resize(); render(); walk.x=5; walk.z=0.4; walk.y=5.2; walk.yaw=0; walk.pitch=-0.12; setNav('walk'); requestAnimationFrame(loop);
+document.fonts && document.fonts.load('700 40px Kalam').then(()=>{ Object.keys(stickyCache).forEach(k=>delete stickyCache[k]); buildAll(); }).catch(()=>{});
+connect();
+</script>
