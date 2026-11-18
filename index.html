@@ -418,7 +418,7 @@ function signTex(){ return canvasTex('backsign',1400,560,(g,W,H)=>{
   g.fillStyle='#1f2320'; g.font='700 40px IBM Plex Sans, sans-serif';
   const lines=['Floor seats · Bumbo seats · feeding boosters · potties','Pack n plays · exersaucers · jump ups · strollers','Activity tables · Cosco cribs · outdoor swings · floor mats','Puzzles (orange boxes) · breast pumps (grey boxes, top)','Socks · sippy cups · plates · snack bowls · safety kits'];
   lines.forEach((l,i)=>g.fillText(l,W/2,160+i*74));
-  g.fillStyle='#5d645d'; g.font='italic 30px IBM Plex Sans, sans-serif'; g.fillText('Best guesses. These boxes were not labeled one by one in the video.',W/2,H-40);
+  g.fillStyle='#5d645d'; g.font='italic 30px IBM Plex Sans, sans-serif'; g.fillText('Best guesses. These boxes are not labeled one by one.',W/2,H-40);
 });}
 function stainTex(){ return canvasTex('stain',512,512,(g,W,H)=>{
   g.clearRect(0,0,W,H); const r=rng('stain');
@@ -974,7 +974,7 @@ function miniMap(ids){
   return svg;
 }
 function whereBlock(ids, fallback){
-  if(!ids.length) return `<div class="where"><div><p class="big">Not spotted in the video</p><p>${esc(fallback||'Check the back wall boxes. Most boxed items from the list are there.')}</p></div>${miniMap(['brown','large'])}</div>`;
+  if(!ids.length) return `<div class="where"><div><p class="big">Location not confirmed yet</p><p>${esc(fallback||'Check the back wall boxes. Most boxed items from the list are there.')}</p></div>${miniMap(['brown','large'])}</div>`;
   const d=directions(ids[0]), c=eff(ids[0]);
   const also = ids.slice(1).map(id=>label(eff(id)));
   return `<div class="where"><div><p class="big">${esc(d.head)}</p><p>${esc(d.text)}</p>
@@ -1015,7 +1015,7 @@ function showDetail(id){
     <ul>${c.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
     ${inv.length?`<div class="hdr" style="padding-inline:0">From the inventory sheet</div><ul>${inv.map(r=>`<li><b>${esc(r.name)}</b>: ${esc(r.count)}</li>`).join('')}</ul>`:''}
     <div class="actions">${walkBtn}${canWrite!==false?'<button class="linkbtn" id="fedit">Something wrong? Fix it</button>':''}</div>
-    <p class="subtle">Seen at ${c.t} in your video ${confPill(c.conf)} ${edited?'<span class="pill edited">edited</span>':''}</p>`;
+    <p class="subtle">${confPill(c.conf)} ${edited?'<span class="pill edited">edited</span>':''}</p>`;
   document.getElementById('dback').onclick=closeDetail;
   const fe=document.getElementById('fedit'); if(fe) fe.onclick=()=>{ editing={type:'c',id}; showDetail(id); };
   wireWalk([id]);
